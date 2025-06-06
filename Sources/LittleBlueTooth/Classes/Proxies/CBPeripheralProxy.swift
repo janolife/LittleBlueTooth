@@ -47,6 +47,8 @@ final class CBPeripheralDelegateProxy: NSObject {
     let peripheralUpdatedValueForDescriptor = PassthroughSubject<(CBDescriptor, LittleBluetoothError?), Never>()
     let peripheralWrittenValueForDescriptor = PassthroughSubject<(CBDescriptor, LittleBluetoothError?), Never>()
     
+    let peripheralOpenedL2CAPChannelPublisher = PassthroughSubject<(CBL2CAPChannel?, LittleBluetoothError?), Never>()
+
     var isLogEnabled: Bool = false
 
 }
@@ -164,6 +166,18 @@ extension CBPeripheralDelegateProxy: CBPeripheralDelegate {
             _peripheralUpdatedNotificationStateForCharacteristicPublisher.send((characteristic, nil))
         }
     }
+
+        func peripheral(_ peripheral: CBPeripheral, didOpen channel: CBL2CAPChannel?, error: Error?) {
+         log("[LBT: CBPD] DidOpenL2CAPChannel, Error %{public}@",
+             log: OSLog.LittleBT_Log_Peripheral,
+             type: .debug,
+             arg: [error?.localizedDescription ?? "None"])
+         if let error = error {
+             peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+         } else {
+             peripheralOpenedL2CAPChannelPublisher.send((channel, nil))
+         }
+     }
 
     // MARK: - Descriptors
 //    func peripheral(_ peripheral: CBPeripheral, didDiscoverDescriptorsFor characteristic: CBCharacteristic, error: Error?){}

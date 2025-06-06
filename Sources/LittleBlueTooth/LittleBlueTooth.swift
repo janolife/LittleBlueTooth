@@ -916,6 +916,39 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         return discoverSubject.eraseToAnyPublisher()
     }
     
+    /// Open an L2CAP channel to the connected peripheral
+    /// - parameter psm: The Protocol/Service Multiplexer (PSM) value for the channel
+    /// - returns: A publisher with the opened L2CAP channel or a LittleBluetoothError
+    public func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
+        
+        let l2capSubject = PassthroughSubject<CBL2CAPChannel, LittleBluetoothError>()
+        let key = UUID()
+        
+        ensureBluetoothState()
+            .customPrint("[LBT] OpenL2CAPChannel", isEnabled: isLogEnabled)
+            .flatMap { [unowned self] _ in
+                self.ensurePeripheralReady()
+            }
+            .flatMap { periph in
+                periph.openL2CAPChannel(psm: psm)
+            }
+            .sink(receiveCompletion: { [unowned self, key] (completion) in
+                switch completion {
+                case .finished:
+                    break
+                case .failure(let error):
+                    l2capSubject.send(completion: .failure(error))
+                    self.removeAndCancelSubscriber(for: key)
+                }
+            }) { [unowned self, key] (channel) in
+                l2capSubject.send(channel)
+                l2capSubject.send(completion: .finished)
+                self.removeAndCancelSubscriber(for: key)
+            }
+            .store(in: &disposeBag, for: key)
+        
+        return l2capSubject.eraseToAnyPublisher()
+    }
     
     // MARK: - Private
     private func restore(_ restorer: CentralRestorer) -> Restored {

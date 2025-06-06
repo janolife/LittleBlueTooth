@@ -575,6 +575,45 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         return writeListen
     }
     
+    func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
+        let futKey = UUID()
+        let openChannel = Deferred {
+            Future<CBL2CAPChannel, LittleBluetoothError> { [unowned self, futKey] promise in
+                self.peripheralProxy.peripheralOpenedL2CAPChannelPublisher
+                    .tryMap { (value) -> CBL2CAPChannel in
+                        switch value {
+                        case let (_, error?):
+                            throw error
+                        case let (channel?, _):
+                            return channel
+                        case (nil, nil):
+                            throw LittleBluetoothError.couldNotOpenL2CAPChannel(error: NSError(domain: "LittleBlueTooth", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unknown L2CAP channel opening error"]))
+                        }
+                    }
+                    .mapError { $0 as! LittleBluetoothError }
+                    .sink(receiveCompletion: { [unowned self, futKey] (completion) in
+                        switch completion {
+                        case .finished:
+                            break
+                        case .failure(let error):
+                            promise(.failure(error))
+                            self.removeAndCancelSubscriber(for: futKey)
+                        }
+                    }) { [unowned self, futKey] (channel) in
+                        promise(.success(channel))
+                        self.removeAndCancelSubscriber(for: futKey)
+                    }
+                    .store(in: &self.disposeBag, for: futKey)
+            }
+        }
+        .eraseToAnyPublisher()
+        
+        defer {
+            cbPeripheral.openL2CAPChannel(psm)
+        }
+        return openChannel
+    }
+    
     // MARK: - Public
     
     /// The maximum amount of data, in bytes, you can send to a characteristic in a single write type.
