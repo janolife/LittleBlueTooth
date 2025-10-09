@@ -23,8 +23,7 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(name: "CoreBluetoothMock",
-                 url: "https://github.com/NordicSemiconductor/IOS-CoreBluetooth-Mock.git",
+        .package(url: "https://github.com/NordicSemiconductor/IOS-CoreBluetooth-Mock.git",
                  .upToNextMinor(from: "0.18.0")),
     ],
     targets: [
