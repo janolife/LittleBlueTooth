@@ -971,6 +971,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                   // since didConnect delegate method won't be called for an already-connected peripheral
                   self.peripheralChangesPublisherCancellable = self._peripheralChangesPublisher.connect()
                   self.peripheralStatePublisherCancellable = self._peripheralStatePublisher.connect()
+                  self.listenPublisherCancellable = self._listenPublisher.connect()
                   print("Peripheral already connected - triggering connection event flow")
 
                   // Send the autoConnected event to trigger the normal connection flow (connectionTasks -> ready)
