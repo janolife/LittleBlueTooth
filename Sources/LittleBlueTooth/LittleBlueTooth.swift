@@ -967,10 +967,18 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
               self.peripheral = Peripheral(cbPeripheral)
               switch cbPeripheral.state {
               case .connected:
-                  // If autoconnection was made in background I should receive a callback from connect and the connection state publisher should take care of putting the peripheral in ready. But probably I must connect other connectable
+                  // When peripheral is restored in connected state, we need to trigger the connection event flow
+                  // since didConnect delegate method won't be called for an already-connected peripheral
                   self.peripheralChangesPublisherCancellable = self._peripheralChangesPublisher.connect()
                   self.peripheralStatePublisherCancellable = self._peripheralStatePublisher.connect()
-                  print("Peripheral already connected")
+                  print("Peripheral already connected - triggering connection event flow")
+
+                  // Send the autoConnected event to trigger the normal connection flow (connectionTasks -> ready)
+                  // This must happen async to allow subscribers to set up first
+                  DispatchQueue.main.async { [weak self] in
+                      guard let self = self else { return }
+                      self.centralProxy.connectionEventPublisher.send(.autoConnected(cbPeripheral))
+                  }
               case .connecting:
                   // If autoconnection was made in background I should receive a callback from connect and the connection state publisher should take care of putting the peripheral in ready. But probably I must connect other connectable
                   self.peripheralChangesPublisherCancellable = self._peripheralChangesPublisher.connect()
