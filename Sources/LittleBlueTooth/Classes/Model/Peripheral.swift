@@ -132,7 +132,11 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         .eraseToAnyPublisher()
         #endif
     }
-    
+
+    deinit {
+        cbPeripheral.delegate = nil
+    }
+
     private func removeAndCancelSubscriber(for key: UUID) {
         let sub = disposeBag[key]
         sub?.cancel()
@@ -434,10 +438,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         let charateristicUUIDFound = characteristics.first(where: { charact in
                             charact.uuid == charateristicUUID
                         })
-                        if charateristicUUIDFound!.isNotifying {
-                            return Result<CBCharacteristic, LittleBluetoothError>.Publisher(.success(charateristicUUIDFound!))
-                                .eraseToAnyPublisher()
-                        }
+                        // Always re-enable notifications to ensure subscription after reconnection
                         defer {
                             self.cbPeripheral.setNotifyValue(true, for: charateristicUUIDFound!)
                         }

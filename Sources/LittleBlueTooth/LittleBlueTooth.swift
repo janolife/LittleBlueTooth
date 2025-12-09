@@ -252,7 +252,21 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                     if let autoCon = self.autoconnectionHandler, let er = error {
                         let periph = PeripheralIdentifier(peripheral: peripheral)
                         if autoCon(periph, er) == true {
-                            _ = self.connect(to: periph, autoreconnect: true)
+                            os_log("[LBT] Autoconnection handler triggered for %@, initiating reconnect...", log: OSLog.LittleBT_Log_General, type: .info, periph.id.uuidString)
+
+                            self.connectionEventSubscriberPeri = self.connect(to: periph, autoreconnect: true)
+                                .sink(
+                                    receiveCompletion: { completion in
+                                        if case .failure(let error) = completion {
+                                            os_log("[LBT] Autoconnection attempt failed: %@", log: OSLog.LittleBT_Log_General, type: .error, String(describing: error))
+                                        } else {
+                                            os_log("[LBT] Autoconnection completed", log: OSLog.LittleBT_Log_General, type: .info)
+                                        }
+                                    },
+                                    receiveValue: { _ in
+                                        os_log("[LBT] Autoconnection successful - peripheral ready", log: OSLog.LittleBT_Log_General, type: .info)
+                                    }
+                                )
                         }
                     }
             }
@@ -276,6 +290,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         scanning?.cancel()
         connectionEventSubscriber?.cancel()
+        connectionEventSubscriberPeri?.cancel()
         disposeBag.removeAll()
         guard let peri = peripheral else {
             return
@@ -1102,6 +1117,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     }
     
     private func cleanUpForDisconnection() {
+        if cbCentral.isScanning {
+            cbCentral.stopScan()
+            scanning?.cancel()
+            scanning = nil
+        }
         listenPublisherCancellable?.cancel()
         listenPublisherCancellable = nil
         _listenPublisher_ = nil
