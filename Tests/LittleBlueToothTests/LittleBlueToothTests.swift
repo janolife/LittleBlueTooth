@@ -11,10 +11,11 @@ import CoreBluetoothMock
 import Combine
 @testable import LittleBlueToothForTest
 
+@MainActor
 class LittleBlueToothTests: XCTestCase {
     var littleBT: LittleBlueTooth!
     var disposeBag: Set<AnyCancellable> = []
-    static var testInitialized: Bool = false
+    nonisolated(unsafe) static var testInitialized: Bool = false
     
     override func setUpWithError() throws {
         try super.setUpWithError()

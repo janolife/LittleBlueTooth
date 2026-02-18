@@ -42,7 +42,7 @@ class CustomOperator: LittleBlueToothTests {
             print("Discovery \(connectedPeriph)")
             connectedPeripheral = connectedPeriph
             self.littleBT.disconnect()
-            .delay(for: .seconds(5), scheduler: DispatchQueue.global())
+            .delay(for: .seconds(5), scheduler: DispatchQueue.main)
             .sink(receiveCompletion: { _ in
             }) { _ in
                 connectionExpectation.fulfill()
@@ -50,21 +50,21 @@ class CustomOperator: LittleBlueToothTests {
             .store(in: &self.disposeBag)
         }
         .store(in: &disposeBag)
-        
+
         waitForExpectations(timeout: 15)
         XCTAssertNotNil(connectedPeripheral)
         XCTAssertEqual(connectedPeripheral!.cbPeripheral.identifier, blinky.identifier)
     }
-    
+
     /// Connection custom operator test
     func testConnectionOperatorFromPeriphIdentifier() {
         disposeBag.removeAll()
         blinkyWOR.simulateProximityChange(.outOfRange)
         blinky.simulateProximityChange(.immediate)
         let connectionExpectation = expectation(description: "Connection identifier expectation")
-        
+
         var connectedPeripheral: Peripheral?
-        
+
         StartLittleBlueTooth
         .startDiscovery(for: self.littleBT, withServices: nil)
         .prefix(1)
@@ -76,7 +76,7 @@ class CustomOperator: LittleBlueToothTests {
             print("Discovery \(connectedPeriph)")
             connectedPeripheral = connectedPeriph
             self.littleBT.disconnect()
-            .delay(for: .seconds(5), scheduler: DispatchQueue.global())
+            .delay(for: .seconds(5), scheduler: DispatchQueue.main)
             .sink(receiveCompletion: { _ in
             }) { _ in
                 connectionExpectation.fulfill()
@@ -105,7 +105,7 @@ class CustomOperator: LittleBlueToothTests {
         .map { _ in
            periphCounter += 1
         }
-        .delay(for: .seconds(5), scheduler: DispatchQueue.global())
+        .delay(for: .seconds(5), scheduler: DispatchQueue.main)
         .stopDiscovery(for: self.littleBT)
         .map {
            isStopped = true
@@ -168,7 +168,7 @@ class CustomOperator: LittleBlueToothTests {
         StartLittleBlueTooth
         .startDiscovery(for: self.littleBT, withServices: nil)
         .connect(for: littleBT)
-        .delay(for: .seconds(5), scheduler: DispatchQueue.global())
+        .delay(for: .seconds(5), scheduler: DispatchQueue.main)
         .disconnect(for: littleBT)
         .sink(receiveCompletion: { completion in
             print("Completion \(completion)")
@@ -424,7 +424,7 @@ class CustomOperator: LittleBlueToothTests {
         .connect(for: self.littleBT)
         .enableListen(for: self.littleBT, from: charateristicOne)
         .enableListen(for: self.littleBT, from: charateristicTwo)
-        .delay(for: .seconds(20), scheduler: DispatchQueue.global())
+        .delay(for: .seconds(20), scheduler: DispatchQueue.main)
         .disableListen(for: self.littleBT, from: charateristicOne)
         .disableListen(for: self.littleBT, from: charateristicTwo)
         .sink(receiveCompletion: { completion in

@@ -357,7 +357,7 @@ class ListenTest: LittleBlueToothTests {
         .flatMap { _ in
             self.littleBT.enableListen(from: charateristicTwo)
         }
-        .delay(for: .seconds(20), scheduler: DispatchQueue.global())
+        .delay(for: .seconds(20), scheduler: DispatchQueue.main)
         .flatMap { _ in
             self.littleBT.disableListen(from: charateristicOne)
         }

@@ -7,7 +7,7 @@
 
 import XCTest
 import Combine
-import CoreBluetoothMock
+@preconcurrency import CoreBluetoothMock
 @testable import LittleBlueToothForTest
 
 
@@ -57,11 +57,13 @@ class StateRestoration: LittleBlueToothTests {
 
         let restoreExpectation = expectation(description: "State restoration")
 
+        let capturedPeri = discoveredPeri
+        let capturedUUID = self.fakeCBUUID
         CBMCentralManagerMock.simulateStateRestoration = { (_) -> [String : Any]  in
             return [
-                CBCentralManagerRestoredStatePeripheralsKey : [discoveredPeri],
+                CBCentralManagerRestoredStatePeripheralsKey : [capturedPeri],
                 CBCentralManagerRestoredStateScanOptionsKey : [CBCentralManagerScanOptionAllowDuplicatesKey : false],
-                CBCentralManagerRestoredStateScanServicesKey : [self.fakeCBUUID]
+                CBCentralManagerRestoredStateScanServicesKey : [capturedUUID]
             ]
         }
 
