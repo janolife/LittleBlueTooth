@@ -29,18 +29,18 @@
 */
 
 import Foundation
-import CoreBluetoothMock
+@preconcurrency import CoreBluetoothMock
 
 // MARK: - Mock nRF Blinky
 
 extension CBMUUID {
-    static let nordicBlinkyService  = CBMUUID(string: "00001523-1212-EFDE-1523-785FEABCD123")
-    static let buttonCharacteristic = CBMUUID(string: "00001524-1212-EFDE-1523-785FEABCD123")
-    static let ledCharacteristic    = CBMUUID(string: "00001525-1212-EFDE-1523-785FEABCD123")
+    nonisolated(unsafe) static let nordicBlinkyService  = CBMUUID(string: "00001523-1212-EFDE-1523-785FEABCD123")
+    nonisolated(unsafe) static let buttonCharacteristic = CBMUUID(string: "00001524-1212-EFDE-1523-785FEABCD123")
+    nonisolated(unsafe) static let ledCharacteristic    = CBMUUID(string: "00001525-1212-EFDE-1523-785FEABCD123")
 }
 
 extension CBMCharacteristicMock {
-    
+
     static let buttonCharacteristic = CBMCharacteristicMock(
         type: .buttonCharacteristic,
         properties: [.notify, .read],
