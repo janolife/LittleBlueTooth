@@ -34,6 +34,7 @@ public enum LittleBluetoothError: Error {
     case couldNotReadFromCharacteristic(characteristic: CBUUID, error: Error)
     case couldNotWriteFromCharacteristic(characteristic: CBUUID, error: Error)
     case couldNotUpdateListenState(characteristic: CBUUID, error: Error)
+    case couldNotOpenL2CAPChannel(error: Error)
     case emptyData
     case couldNotConvertDataToRead(data: Data, type: String)
     case peripheralNotConnected(state: PeripheralState)
