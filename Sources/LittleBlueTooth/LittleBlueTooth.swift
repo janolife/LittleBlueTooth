@@ -105,6 +105,10 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     }
     
     // MARK: - Private variables
+    /// Queue used for internal event dispatching. Uses the centralManagerQueue if provided,
+    /// otherwise falls back to DispatchQueue.main. Using a background queue allows
+    /// connection events (including autoconnection) to be processed when the app is backgrounded.
+    let eventQueue: DispatchQueue
     /// Cancellable operation idendified by a `UUID` key
     private var disposeBag = [UUID : AnyCancellable]()
     /// Scan cancellable operation
@@ -183,6 +187,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     
     // MARK: - Init
     public init(with configuration: LittleBluetoothConfiguration) {
+        self.eventQueue = configuration.centralManagerQueue ?? .main
         #if TEST
         self.cbCentral = CBCentralManagerFactory.instance(delegate: self.centralProxy, queue: configuration.centralManagerQueue, options: configuration.centralManagerOptions, forceMock: true)
         #else
@@ -221,20 +226,20 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                         // TEMPORARY WORKAROUND: Those Dispatch async will make the states flow correctly in the process: first connect, then ready. Without it would be the contrary
                         return AnyPublisher(connTask)
                             .catch { [unowned self] (error) -> Just<Void> in
-                                DispatchQueue.main.async {
+                                self.eventQueue.async {
                                     self.centralProxy.connectionEventPublisher.send(ConnectionEvent.notReady(periph, error: error))
                                 }
                                 return Just(())
                         }
-                        .map { _ in
-                            DispatchQueue.main.async {
+                        .map { [unowned self] _ in
+                            self.eventQueue.async {
                                 self.centralProxy.connectionEventPublisher.send(ConnectionEvent.ready(periph))
                             }
                             return event
                         }
                         .eraseToAnyPublisher()
                     } else {
-                        DispatchQueue.main.async {
+                        self.eventQueue.async {
                             self.centralProxy.connectionEventPublisher.send(ConnectionEvent.ready(periph))
                         }
                         return Just(event).eraseToAnyPublisher()
@@ -244,7 +249,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 }
             }
                 // This delay to make able other subscribers to receive notification
-            .delay(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .delay(for: .milliseconds(50), scheduler: eventQueue)
             .sink { [unowned self] (event) in
 //                print("Sinking event \(event)")
                 if case ConnectionEvent.disconnected( let peripheral, let error) = event {
@@ -991,7 +996,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
 
                   // Send the autoConnected event to trigger the normal connection flow (connectionTasks -> ready)
                   // This must happen async to allow subscribers to set up first
-                  DispatchQueue.main.async { [weak self] in
+                  self.eventQueue.async { [weak self] in
                       guard let self = self else { return }
                       self.centralProxy.connectionEventPublisher.send(.autoConnected(cbPeripheral))
                   }

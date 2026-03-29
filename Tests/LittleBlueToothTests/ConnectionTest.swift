@@ -250,6 +250,24 @@ class ConnectionTest: LittleBlueToothTests {
     }
     
     
+    func testEventQueueDefaultsToMain() {
+        // When no centralManagerQueue is provided, eventQueue should be main
+        var configuration = LittleBluetoothConfiguration()
+        configuration.isLogEnabled = true
+        let lbt = LittleBlueTooth(with: configuration)
+        XCTAssertEqual(lbt.eventQueue, DispatchQueue.main, "eventQueue should default to main when no centralManagerQueue provided")
+    }
+
+    func testEventQueueUsesProvidedQueue() {
+        // When a centralManagerQueue is provided, eventQueue should match it
+        let bgQueue = DispatchQueue(label: "test.background.queue")
+        var configuration = LittleBluetoothConfiguration()
+        configuration.isLogEnabled = true
+        configuration.centralManagerQueue = bgQueue
+        let lbt = LittleBlueTooth(with: configuration)
+        XCTAssertEqual(lbt.eventQueue.label, bgQueue.label, "eventQueue should use the provided centralManagerQueue")
+    }
+
     func testAutoConnection() {
         disposeBag.removeAll()
         
