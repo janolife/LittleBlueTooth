@@ -105,6 +105,10 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     }
     
     // MARK: - Private variables
+    /// Queue used for internal event dispatching. Uses the centralManagerQueue if provided,
+    /// otherwise falls back to DispatchQueue.main. Using a background queue allows
+    /// connection events (including autoconnection) to be processed when the app is backgrounded.
+    let eventQueue: DispatchQueue
     /// Cancellable operation idendified by a `UUID` key
     private var disposeBag = [UUID : AnyCancellable]()
     /// Scan cancellable operation
@@ -183,6 +187,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     
     // MARK: - Init
     public init(with configuration: LittleBluetoothConfiguration) {
+        self.eventQueue = configuration.centralManagerQueue ?? .main
         #if TEST
         self.cbCentral = CBCentralManagerFactory.instance(delegate: self.centralProxy, queue: configuration.centralManagerQueue, options: configuration.centralManagerOptions, forceMock: true)
         #else
@@ -221,20 +226,20 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                         // TEMPORARY WORKAROUND: Those Dispatch async will make the states flow correctly in the process: first connect, then ready. Without it would be the contrary
                         return AnyPublisher(connTask)
                             .catch { [unowned self] (error) -> Just<Void> in
-                                DispatchQueue.main.async {
+                                self.eventQueue.async {
                                     self.centralProxy.connectionEventPublisher.send(ConnectionEvent.notReady(periph, error: error))
                                 }
                                 return Just(())
                         }
-                        .map { _ in
-                            DispatchQueue.main.async {
+                        .map { [unowned self] _ in
+                            self.eventQueue.async {
                                 self.centralProxy.connectionEventPublisher.send(ConnectionEvent.ready(periph))
                             }
                             return event
                         }
                         .eraseToAnyPublisher()
                     } else {
-                        DispatchQueue.main.async {
+                        self.eventQueue.async {
                             self.centralProxy.connectionEventPublisher.send(ConnectionEvent.ready(periph))
                         }
                         return Just(event).eraseToAnyPublisher()
@@ -244,11 +249,13 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 }
             }
                 // This delay to make able other subscribers to receive notification
-            .delay(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .delay(for: .milliseconds(50), scheduler: eventQueue)
             .sink { [unowned self] (event) in
 //                print("Sinking event \(event)")
-                if case ConnectionEvent.disconnected( let peripheral, let error) = event {
+                if case ConnectionEvent.disconnected( let peripheral, let error, let isReconnecting) = event {
                     self.cleanUpForDisconnection()
+                    // If the system is already reconnecting (iOS 17+), skip manual autoconnection
+                    guard !isReconnecting else { return }
                     if let autoCon = self.autoconnectionHandler, let er = error {
                         let periph = PeripheralIdentifier(peripheral: peripheral)
                         if autoCon(periph, er) == true {
@@ -756,11 +763,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
                 self.peripheral = nil
                 throw LittleBluetoothError.couldNotConnectToPeripheral(PeripheralIdentifier(peripheral: periph), nil)
-            case .disconnected(_, let error?):
+            case .disconnected(_, let error?, _):
                 self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
                 self.peripheral = nil
                 throw error
-            case .disconnected(let periph, _):
+            case .disconnected(let periph, _, _):
                 self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
                 self.peripheral = nil
                 throw LittleBluetoothError.peripheralDisconnected(PeripheralIdentifier(peripheral: periph), nil)
@@ -810,13 +817,13 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         self.centralProxy.connectionEventPublisher
         .customPrint("[LBT] DisconnectPublisher", isEnabled: isLogEnabled)
         .filter{ (event) -> Bool in
-            if case ConnectionEvent.disconnected(_, error: _) = event {
+            if case ConnectionEvent.disconnected(_, error: _, isReconnecting: _) = event {
                 return true
             }
             return false
         }
         .sink { [unowned self, key, periph] (event) in
-            if case ConnectionEvent.disconnected( _, let error) = event {
+            if case ConnectionEvent.disconnected( _, let error, _) = event {
                 if error != nil {
                     disconnectionSubject.send(completion: .failure(error!))
                 } else {
@@ -931,14 +938,15 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         return discoverSubject.eraseToAnyPublisher()
     }
     
+    #if !TEST
     /// Open an L2CAP channel to the connected peripheral
     /// - parameter psm: The Protocol/Service Multiplexer (PSM) value for the channel
     /// - returns: A publisher with the opened L2CAP channel or a LittleBluetoothError
     public func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
-        
+
         let l2capSubject = PassthroughSubject<CBL2CAPChannel, LittleBluetoothError>()
         let key = UUID()
-        
+
         ensureBluetoothState()
             .customPrint("[LBT] OpenL2CAPChannel", isEnabled: isLogEnabled)
             .flatMap { [unowned self] _ in
@@ -961,9 +969,10 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 self.removeAndCancelSubscriber(for: key)
             }
             .store(in: &disposeBag, for: key)
-        
+
         return l2capSubject.eraseToAnyPublisher()
     }
+    #endif
     
     // MARK: - Private
     private func restore(_ restorer: CentralRestorer) -> Restored {
@@ -978,8 +987,9 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                   arg: [restorer.centralManager.isScanning ? "true" : "false"])
               return .scan(discoveryPublisher: restoreDiscoveryPublisher)
           }
-          if let periph = restorer.peripherals.first, let cbPeripheral = periph.cbPeripheral {
+          if let cbPeripheral = restorer.peripherals.first {
               self.peripheral = Peripheral(cbPeripheral)
+              self.peripheral!.skipServiceCache = true
               switch cbPeripheral.state {
               case .connected:
                   // When peripheral is restored in connected state, we need to trigger the connection event flow
@@ -991,7 +1001,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
 
                   // Send the autoConnected event to trigger the normal connection flow (connectionTasks -> ready)
                   // This must happen async to allow subscribers to set up first
-                  DispatchQueue.main.async { [weak self] in
+                  self.eventQueue.async { [weak self] in
                       guard let self = self else { return }
                       self.centralProxy.connectionEventPublisher.send(.autoConnected(cbPeripheral))
                   }
@@ -1036,7 +1046,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                     switch state {
                     case .poweredOff:
                         if let periph = self.peripheral {
-                            let connEvent = ConnectionEvent.disconnected(periph.cbPeripheral, error: .bluetoothPoweredOff)
+                            let connEvent = ConnectionEvent.disconnected(periph.cbPeripheral, error: .bluetoothPoweredOff, isReconnecting: false)
                             self.centralProxy.connectionEventPublisher.send(connEvent)
                         }
                         throw LittleBluetoothError.bluetoothPoweredOff
@@ -1086,9 +1096,9 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         .customPrint("[LBT] EnsurePeripheralReadyPublisher", isEnabled: isLogEnabled)
         .tryFilter { (event) -> Bool in
             switch event {
-            case .disconnected(_, let error?):
+            case .disconnected(_, let error?, _):
                 throw error
-            case .disconnected(let periph, _):
+            case .disconnected(let periph, _, _):
                 throw LittleBluetoothError.peripheralDisconnected(PeripheralIdentifier(peripheral: periph), nil)
             case .autoConnected(_),
                  .connected(_),
@@ -1099,8 +1109,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 return true
             }
         }
-        .map { [unowned self] (_) -> Peripheral in
-            return self.peripheral!
+        .tryMap { [unowned self] (_) -> Peripheral in
+            guard let p = self.peripheral else {
+                throw LittleBluetoothError.peripheralNotConnected(state: .disconnected)
+            }
+            return p
         }
         .mapError { (error) -> LittleBluetoothError in
             error as! LittleBluetoothError
@@ -1133,7 +1146,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         _peripheralChangesPublisher_ = nil
         peripheral = nil
     }
-    
+
     private func cleanUpForExtraction() {
         cbCentral.stopScan()
         scanning?.cancel()

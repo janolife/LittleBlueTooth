@@ -26,8 +26,9 @@ public enum ConnectionEvent {
     case notReady(CBPeripheral, error: LittleBluetoothError?)
     /// Process of connection has failed
     case connectionFailed(CBPeripheral, error: LittleBluetoothError?)
-    /// Peripheral has been disconnected, if it was unexpected a `LittleBluetoothError` is returned
-    case disconnected(CBPeripheral, error: LittleBluetoothError?)
+    /// Peripheral has been disconnected, if it was unexpected a `LittleBluetoothError` is returned.
+    /// `isReconnecting` is true when the system is already reconnecting automatically (iOS 17+).
+    case disconnected(CBPeripheral, error: LittleBluetoothError?, isReconnecting: Bool)
 }
 
 /// An enumeration representing the state of the bluetooth stack of the device
@@ -130,18 +131,19 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
         }
     }
     
-    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral: CBPeripheral, error: Error?) {
-        log("[LBT: CBCMD] DidDisconnect %{public}@, Error %{public}@",
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: Error?) {
+        log("[LBT: CBCMD] DidDisconnect %{public}@, isReconnecting: %{public}d, Error %{public}@",
             log: OSLog.LittleBT_Log_CentralManager,
             type: .debug,
-            arg: [didDisconnectPeripheral.description,
+            arg: [peripheral.description,
+            isReconnecting ? 1 : 0,
             error?.localizedDescription ?? ""])
         isAutoconnectionActive = false
         var lttlError: LittleBluetoothError?
         if let error = error {
-            lttlError = .peripheralDisconnected(PeripheralIdentifier(peripheral: didDisconnectPeripheral), error)
+            lttlError = .peripheralDisconnected(PeripheralIdentifier(peripheral: peripheral), error)
         }
-        let event = ConnectionEvent.disconnected(didDisconnectPeripheral, error: lttlError)
+        let event = ConnectionEvent.disconnected(peripheral, error: lttlError, isReconnecting: isReconnecting)
         connectionEventPublisher.send(event)
     }
     

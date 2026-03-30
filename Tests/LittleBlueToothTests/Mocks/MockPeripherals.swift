@@ -83,7 +83,7 @@ private class BlinkyCBMPeripheralSpecDelegate: CBMPeripheralSpecDelegate {
     }
 
     func peripheral(_ peripheral: CBMPeripheralSpec,
-                    didReceiveReadRequestFor characteristic: CBMCharacteristic)
+                    didReceiveReadRequestFor characteristic: CBMCharacteristicMock)
             -> Result<Data, Error> {
         if characteristic.uuid == .ledCharacteristic {
             return .success(ledData)
@@ -91,9 +91,9 @@ private class BlinkyCBMPeripheralSpecDelegate: CBMPeripheralSpecDelegate {
             return .success(buttonData)
         }
     }
-    
+
     func peripheral(_ peripheral: CBMPeripheralSpec,
-                    didReceiveWriteRequestFor characteristic: CBMCharacteristic,
+                    didReceiveWriteRequestFor characteristic: CBMCharacteristicMock,
                     data: Data) -> Result<Void, Error> {
         if characteristic.uuid == .ledCharacteristic {
             if !data.isEmpty {
@@ -124,6 +124,7 @@ let blinky = CBMPeripheralSpec
         services: [.blinkyService],
         delegate: BlinkyCBMPeripheralSpecDelegate(),
         connectionInterval: 0.150,
+        supervisionTimeout: 0.5,
         mtu: 23)
     .build()
 
@@ -142,6 +143,7 @@ let blinkyWOR = CBMPeripheralSpec
         services: [.blinkyService],
         delegate: BlinkyCBMPeripheralSpecDelegate(),
         connectionInterval: 0.150,
+        supervisionTimeout: 0.5,
         mtu: 3)
     .build()
 
