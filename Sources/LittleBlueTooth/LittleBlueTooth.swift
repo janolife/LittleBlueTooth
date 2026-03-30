@@ -252,8 +252,10 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             .delay(for: .milliseconds(50), scheduler: eventQueue)
             .sink { [unowned self] (event) in
 //                print("Sinking event \(event)")
-                if case ConnectionEvent.disconnected( let peripheral, let error) = event {
+                if case ConnectionEvent.disconnected( let peripheral, let error, let isReconnecting) = event {
                     self.cleanUpForDisconnection()
+                    // If the system is already reconnecting (iOS 17+), skip manual autoconnection
+                    guard !isReconnecting else { return }
                     if let autoCon = self.autoconnectionHandler, let er = error {
                         let periph = PeripheralIdentifier(peripheral: peripheral)
                         if autoCon(periph, er) == true {
@@ -761,11 +763,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
                 self.peripheral = nil
                 throw LittleBluetoothError.couldNotConnectToPeripheral(PeripheralIdentifier(peripheral: periph), nil)
-            case .disconnected(_, let error?):
+            case .disconnected(_, let error?, _):
                 self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
                 self.peripheral = nil
                 throw error
-            case .disconnected(let periph, _):
+            case .disconnected(let periph, _, _):
                 self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
                 self.peripheral = nil
                 throw LittleBluetoothError.peripheralDisconnected(PeripheralIdentifier(peripheral: periph), nil)
@@ -815,13 +817,13 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         self.centralProxy.connectionEventPublisher
         .customPrint("[LBT] DisconnectPublisher", isEnabled: isLogEnabled)
         .filter{ (event) -> Bool in
-            if case ConnectionEvent.disconnected(_, error: _) = event {
+            if case ConnectionEvent.disconnected(_, error: _, isReconnecting: _) = event {
                 return true
             }
             return false
         }
         .sink { [unowned self, key, periph] (event) in
-            if case ConnectionEvent.disconnected( _, let error) = event {
+            if case ConnectionEvent.disconnected( _, let error, _) = event {
                 if error != nil {
                     disconnectionSubject.send(completion: .failure(error!))
                 } else {
@@ -985,8 +987,9 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                   arg: [restorer.centralManager.isScanning ? "true" : "false"])
               return .scan(discoveryPublisher: restoreDiscoveryPublisher)
           }
-          if let periph = restorer.peripherals.first, let cbPeripheral = periph.cbPeripheral {
+          if let cbPeripheral = restorer.peripherals.first {
               self.peripheral = Peripheral(cbPeripheral)
+              self.peripheral!.skipServiceCache = true
               switch cbPeripheral.state {
               case .connected:
                   // When peripheral is restored in connected state, we need to trigger the connection event flow
@@ -1043,7 +1046,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                     switch state {
                     case .poweredOff:
                         if let periph = self.peripheral {
-                            let connEvent = ConnectionEvent.disconnected(periph.cbPeripheral, error: .bluetoothPoweredOff)
+                            let connEvent = ConnectionEvent.disconnected(periph.cbPeripheral, error: .bluetoothPoweredOff, isReconnecting: false)
                             self.centralProxy.connectionEventPublisher.send(connEvent)
                         }
                         throw LittleBluetoothError.bluetoothPoweredOff
@@ -1093,9 +1096,9 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         .customPrint("[LBT] EnsurePeripheralReadyPublisher", isEnabled: isLogEnabled)
         .tryFilter { (event) -> Bool in
             switch event {
-            case .disconnected(_, let error?):
+            case .disconnected(_, let error?, _):
                 throw error
-            case .disconnected(let periph, _):
+            case .disconnected(let periph, _, _):
                 throw LittleBluetoothError.peripheralDisconnected(PeripheralIdentifier(peripheral: periph), nil)
             case .autoConnected(_),
                  .connected(_),

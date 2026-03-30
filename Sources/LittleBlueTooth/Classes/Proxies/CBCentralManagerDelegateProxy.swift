@@ -26,8 +26,9 @@ public enum ConnectionEvent {
     case notReady(CBPeripheral, error: LittleBluetoothError?)
     /// Process of connection has failed
     case connectionFailed(CBPeripheral, error: LittleBluetoothError?)
-    /// Peripheral has been disconnected, if it was unexpected a `LittleBluetoothError` is returned
-    case disconnected(CBPeripheral, error: LittleBluetoothError?)
+    /// Peripheral has been disconnected, if it was unexpected a `LittleBluetoothError` is returned.
+    /// `isReconnecting` is true when the system is already reconnecting automatically (iOS 17+).
+    case disconnected(CBPeripheral, error: LittleBluetoothError?, isReconnecting: Bool)
 }
 
 /// An enumeration representing the state of the bluetooth stack of the device
@@ -142,7 +143,7 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
         if let error = error {
             lttlError = .peripheralDisconnected(PeripheralIdentifier(peripheral: peripheral), error)
         }
-        let event = ConnectionEvent.disconnected(peripheral, error: lttlError)
+        let event = ConnectionEvent.disconnected(peripheral, error: lttlError, isReconnecting: isReconnecting)
         connectionEventPublisher.send(event)
     }
     

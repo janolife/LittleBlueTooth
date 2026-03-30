@@ -71,7 +71,12 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     
     /// The wrapped `CBPeripheral`
     public let cbPeripheral: CBPeripheral
-    
+
+    /// When true, `getService` bypasses the cached services check and always
+    /// performs fresh BLE discovery. Set this after state restoration where
+    /// cached services may have stale/empty characteristic values.
+    public var skipServiceCache: Bool = false
+
     /// Logging on the peripheral can be disable or enabled acting of that property
     var isLogEnabled: Bool {
         get {
@@ -144,11 +149,10 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     }
     
     func getService(serviceUUID: CBUUID?) -> AnyPublisher<[CBService]?, LittleBluetoothError> {
-        if let serviceUUID,
+        if !skipServiceCache,
+           let serviceUUID,
            let services = self.cbPeripheral.services,
-           services.contains(where: { (service) -> Bool in
-            return service.uuid == serviceUUID
-        }) {
+           services.contains(where: { $0.uuid == serviceUUID }) {
             return Result<[CBService]?, LittleBluetoothError>.Publisher(.success(services)).eraseToAnyPublisher()
         } else {
             let futKey = UUID()
@@ -609,7 +613,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
             }
         }
         .eraseToAnyPublisher()
-        
+
         defer {
             cbPeripheral.openL2CAPChannel(psm)
         }
