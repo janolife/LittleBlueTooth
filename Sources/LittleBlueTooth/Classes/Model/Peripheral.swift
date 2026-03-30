@@ -576,6 +576,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         return writeListen
     }
     
+    #if !TEST
     func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
         let futKey = UUID()
         let openChannel = Deferred {
@@ -614,7 +615,8 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         }
         return openChannel
     }
-    
+    #endif
+
     // MARK: - Public
     
     /// The maximum amount of data, in bytes, you can send to a characteristic in a single write type.
