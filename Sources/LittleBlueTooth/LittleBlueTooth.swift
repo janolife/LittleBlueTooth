@@ -855,7 +855,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         ensureBluetoothState()
             .customPrint("[LBT] Discovering services", isEnabled: isLogEnabled)
             .flatMap { [unowned self] _ in
-                self.peripheral!.getService(serviceUUID: service !=  nil ? CBUUID(string: service!) : nil )
+                guard let peripheral = self.peripheral else {
+                    return Fail<[CBService]?, LittleBluetoothError>(error: LittleBluetoothError.peripheralNotFound)
+                        .eraseToAnyPublisher()
+                }
+                return peripheral.getService(serviceUUID: service !=  nil ? CBUUID(string: service!) : nil )
             }
             .sink(receiveCompletion: { [unowned self, futKey] (completion) in
                 switch completion {
@@ -887,7 +891,13 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         ensureBluetoothState()
             .customPrint("[LBT] Discovering characteristics", isEnabled: isLogEnabled)
             .flatMap { [unowned self] _ in
-                self.peripheral!.discoverCharacteristics(characteristic != nil ? [CBUUID(string: characteristic!)] : nil, fromService: service.uuid)
+                guard let peripheral = self.peripheral else {
+                    return Fail<[CBCharacteristic]?, LittleBluetoothError>(error: LittleBluetoothError.peripheralNotFound)
+                        .eraseToAnyPublisher()
+                }
+                return peripheral.discoverCharacteristics(characteristic != nil ? [CBUUID(string: characteristic!)] : nil, fromService: service.uuid)
+                    .map { $0 as [CBCharacteristic]? }
+                    .eraseToAnyPublisher()
             }
             .sink(receiveCompletion: { [unowned self, futKey] (completion) in
                 switch completion {
