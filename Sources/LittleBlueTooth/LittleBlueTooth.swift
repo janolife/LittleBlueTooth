@@ -931,14 +931,15 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         return discoverSubject.eraseToAnyPublisher()
     }
     
+    #if !TEST
     /// Open an L2CAP channel to the connected peripheral
     /// - parameter psm: The Protocol/Service Multiplexer (PSM) value for the channel
     /// - returns: A publisher with the opened L2CAP channel or a LittleBluetoothError
     public func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
-        
+
         let l2capSubject = PassthroughSubject<CBL2CAPChannel, LittleBluetoothError>()
         let key = UUID()
-        
+
         ensureBluetoothState()
             .customPrint("[LBT] OpenL2CAPChannel", isEnabled: isLogEnabled)
             .flatMap { [unowned self] _ in
@@ -961,9 +962,10 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 self.removeAndCancelSubscriber(for: key)
             }
             .store(in: &disposeBag, for: key)
-        
+
         return l2capSubject.eraseToAnyPublisher()
     }
+    #endif
     
     // MARK: - Private
     private func restore(_ restorer: CentralRestorer) -> Restored {
@@ -1099,8 +1101,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 return true
             }
         }
-        .map { [unowned self] (_) -> Peripheral in
-            return self.peripheral!
+        .tryMap { [unowned self] (_) -> Peripheral in
+            guard let p = self.peripheral else {
+                throw LittleBluetoothError.peripheralNotConnected(state: .disconnected)
+            }
+            return p
         }
         .mapError { (error) -> LittleBluetoothError in
             error as! LittleBluetoothError
@@ -1133,7 +1138,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         _peripheralChangesPublisher_ = nil
         peripheral = nil
     }
-    
+
     private func cleanUpForExtraction() {
         cbCentral.stopScan()
         scanning?.cancel()
