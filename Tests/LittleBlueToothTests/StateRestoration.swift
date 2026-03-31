@@ -33,7 +33,7 @@ class StateRestoration: LittleBlueToothTests {
         littleBTConf.centralManagerOptions = [CBMCentralManagerOptionRestoreIdentifierKey : "myIdentifier"]
         littleBT = LittleBlueTooth(with: littleBTConf)
 
-        var periph: [PeripheralIdentifier]?
+        var periph: [CBPeripheral]?
         var scanOptions: [String : Any]?
         var scanServices: [CBUUID]?
 
