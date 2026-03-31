@@ -23,11 +23,8 @@ public struct CentralRestorer {
     /// Array of `PeripheralIdentifier` objects which have been restored.
     /// These are peripherals that were connected to the central manager (or had a connection pending)
     /// at the time the app was terminated by the system.
-    public var peripherals: [PeripheralIdentifier] {
-        if let peripherals = restoredInfo[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] {
-            return centralManager.retrievePeripherals(withIdentifiers: peripherals.map{$0.identifier}).map {PeripheralIdentifier(peripheral: $0)}
-        }
-        return []
+    public var peripherals: [CBPeripheral] {
+        restoredInfo[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
     }
     
     /// Dictionary that contains all of the peripheral scan options that were being used
