@@ -14,7 +14,7 @@ import CoreBluetoothMock
 import Combine
 @testable import LittleBlueToothForTest
 
-/// Thread-safe log collector for tests
+/// Thread-safe log collector for unstructured string logs
 final class LogCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var _messages = [String]()
@@ -33,6 +33,30 @@ final class LogCollector: @unchecked Sendable {
 
     func contains(_ substring: String) -> Bool {
         messages.contains(where: { $0.contains(substring) })
+    }
+}
+
+/// Thread-safe collector for structured logs
+final class StructuredLogCollector: @unchecked Sendable {
+    struct Entry {
+        let message: String
+        let level: LBTLogLevel
+        let category: LBTLogCategory
+    }
+
+    private let lock = NSLock()
+    private var _messages = [Entry]()
+
+    var messages: [Entry] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _messages
+    }
+
+    func append(_ message: String, _ level: LBTLogLevel, _ category: LBTLogCategory) {
+        lock.lock()
+        _messages.append(Entry(message: message, level: level, category: category))
+        lock.unlock()
     }
 }
 
@@ -193,7 +217,7 @@ class ReconnectionTest: LittleBlueToothTests {
             CBConnectPeripheralOptionNotifyOnConnectionKey: true as NSNumber,
             CBConnectPeripheralOptionNotifyOnDisconnectionKey: true as NSNumber,
         ]
-        config.logHandler = { message in
+        config.logHandler = { message, level, category in
             logs.append(message)
         }
         littleBT = LittleBlueTooth(with: config)
@@ -302,19 +326,18 @@ class ReconnectionTest: LittleBlueToothTests {
 
     // MARK: - Structured logging
 
-    /// The logHandler should receive structured messages with connection lifecycle events.
-    func testLogHandlerReceivesConnectionEvents() {
+    /// The logHandler should receive structured log messages with level and category.
+    func testStructuredLogHandlerReceivesConnectionEvents() {
         disposeBag.removeAll()
         blinky.simulateProximityChange(.immediate)
 
         let disconnectLogged = expectation(description: "Disconnect logged via handler")
-        let logs = LogCollector()
+        let logs = StructuredLogCollector()
 
         var config = LittleBluetoothConfiguration()
-        config.isLogEnabled = true
-        config.logHandler = { message in
-            logs.append(message)
-            if message.contains("Disconnected") {
+        config.logHandler = { message, level, category in
+            logs.append(message, level, category)
+            if category == .connection && message.hasPrefix("Disconnected:") {
                 disconnectLogged.fulfill()
             }
         }
@@ -333,9 +356,43 @@ class ReconnectionTest: LittleBlueToothTests {
 
         waitForExpectations(timeout: 15)
 
-        XCTAssertTrue(logs.contains("Connection event"),
-                      "Should log connection events")
-        XCTAssertTrue(logs.contains("Disconnected"),
-                      "Should log disconnect")
+        // Should have connection-category logs
+        let connectionLogs = logs.messages.filter { $0.category == .connection }
+        XCTAssertFalse(connectionLogs.isEmpty, "Should have connection category logs")
+
+        // Disconnect should be at .info level
+        let disconnectLogs = connectionLogs.filter { $0.message.hasPrefix("Disconnected:") }
+        XCTAssertFalse(disconnectLogs.isEmpty, "Should log disconnect")
+        XCTAssertEqual(disconnectLogs.first?.level, .info)
+    }
+
+    /// Verify GATT operations produce gatt-category logs
+    func testStructuredLogHandlerReceivesGATTLogs() {
+        let logs = StructuredLogCollector()
+        var config = LittleBluetoothConfiguration()
+        config.logHandler = { message, level, category in
+            logs.append(message, level, category)
+        }
+        littleBT = LittleBlueTooth(with: config)
+
+        let readDone = connectBlinky()
+        wait(for: [readDone], timeout: 10)
+
+        let readExpectation = expectation(description: "Read complete")
+        let characteristic = LittleBlueToothCharacteristic(
+            characteristic: CBMUUID.ledCharacteristic.uuidString,
+            for: CBMUUID.nordicBlinkyService.uuidString,
+            properties: [.read, .write]
+        )
+        littleBT.read(from: characteristic)
+            .sink(receiveCompletion: { _ in }, receiveValue: { (state: LedState) in
+                readExpectation.fulfill()
+            })
+            .store(in: &disposeBag)
+
+        wait(for: [readExpectation], timeout: 10)
+
+        let gattLogs = logs.messages.filter { $0.category == .gatt }
+        XCTAssertFalse(gattLogs.isEmpty, "Read operation should produce gatt-category logs")
     }
 }

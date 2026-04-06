@@ -240,13 +240,11 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         let discovery = Deferred {
             Future<[CBCharacteristic], LittleBluetoothError> { [unowned self, futKey] promise in
                 self.getService(serviceUUID: serviceUUID)
-                    .customPrint("[LBT] Discover service", isEnabled: isLogEnabled)
-                    .flatMap { services -> AnyPublisher<CBService, LittleBluetoothError> in
+                                        .flatMap { services -> AnyPublisher<CBService, LittleBluetoothError> in
                         let service = services!.filter{ $0.uuid == serviceUUID}.first!
                         return self.getCharateristics(characteristicUUIDs: charateristicUUIDs, from: service)
                     }
-                    .customPrint("[LBT] Discover characteristic", isEnabled: isLogEnabled)
-                    .filter { (service) -> Bool in
+                                        .filter { (service) -> Bool in
                         if charateristicUUIDs == nil {
                             return true
                         } else if let characteristics = service.characteristics?.map({$0.uuid}),

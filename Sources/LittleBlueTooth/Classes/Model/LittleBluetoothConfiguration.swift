@@ -36,10 +36,9 @@ public struct LittleBluetoothConfiguration {
     public var restoreHandler: ((Restored) -> Void)?
     /// Enable logging, log is made using os_log and it exposes some information even in release configuration
     public var isLogEnabled = false
-    /// Optional external log handler called for key connection lifecycle events
-    /// (autoconnection triggers, failures, state changes). Use this to bridge
-    /// LittleBlueTooth logs into your app's logging pipeline.
-    public var logHandler: (@Sendable (_ message: String) -> Void)?
+    /// Structured log handler. Receives all LittleBlueTooth log messages with
+    /// level and category for filtering.
+    public var logHandler: LBTLogHandler?
 
     public init() {}
 }
