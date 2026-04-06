@@ -1,5 +1,5 @@
 //
-//  CBManagerDelegateProxy.swift
+//  CBCentralManagerDelegateProxy.swift
 //  LittleBlueTooth
 //
 //  Created by Andrea Finollo on 10/06/2020.
@@ -10,11 +10,11 @@ import Foundation
 import Combine
 import os.log
 #if TEST
-import CoreBluetoothMock
+@preconcurrency import CoreBluetoothMock
 #else
-import CoreBluetooth
+@preconcurrency import CoreBluetooth
 #endif
-/// An enum representing the connection event that has occurred
+
 public enum ConnectionEvent {
     /// Peripheral is connected but not ready to receive command
     case connected(CBPeripheral)
@@ -36,16 +36,15 @@ public enum BluetoothState {
     case unknown
     /// Bluetooth is resetting
     case resetting
-    /// Bluetooth is not supported for this device
+    /// Bluetooth unsupported on this device
     case unsupported
-    /// The application is not authorized to use bluetooth
+    /// Bluetooth is unauthorized
     case unauthorized
-    /// The bluetooth is off
+    /// Bluetooth is powered off
     case poweredOff
-    /// The bluetooth is on and ready
+    /// Bluetooth is powered on
     case poweredOn
-    
-    /// Inizialize using a `CBManagerState`
+
     init(_ state: CBManagerState) {
         switch state {
         case .unknown:
@@ -60,67 +59,58 @@ public enum BluetoothState {
             self = .poweredOff
         case .poweredOn:
             self = .poweredOn
-        #if !TEST
         @unknown default:
-            fatalError()
-        #endif
+            self = .unknown
         }
     }
 }
 
-final class CBCentralManagerDelegateProxy: NSObject {
-    
+class CBCentralManagerDelegateProxy: NSObject {
+
+    /// Publisher containing discovered peripherals
     let centralDiscoveriesPublisher = PassthroughSubject<PeripheralDiscovery, Never>()
+    /// Connection event publisher
     let connectionEventPublisher = PassthroughSubject<ConnectionEvent, Never>()
-    lazy var centralStatePublisher: AnyPublisher<BluetoothState, Never>
-        = {
-            self._centralStatePublisher.eraseToAnyPublisher()
-    }()
+    /// Central state publisher
+    let _centralStatePublisher = CurrentValueSubject<BluetoothState, Never>(.unknown)
+
+    var centralStatePublisher: AnyPublisher<BluetoothState, Never> {
+        _centralStatePublisher.eraseToAnyPublisher()
+    }
 
     lazy var willRestoreStatePublisher: AnyPublisher<CentralRestorer, Never> = {
         _willRestoreStatePublisher.shareReplay(1).eraseToAnyPublisher()
     }()
-    
-    let _centralStatePublisher = CurrentValueSubject<BluetoothState, Never>(.unknown)
+
     let _willRestoreStatePublisher = PassthroughSubject<CentralRestorer, Never>()
 
-    var isLogEnabled: Bool = false
     var isAutoconnectionActive = false
     var logHandler: LBTLogHandler?
     var stateRestorationCancellable: AnyCancellable!
-    
+
     override init() {
         super.init()
         self.stateRestorationCancellable = willRestoreStatePublisher.sink { _ in }
     }
-   
+
 }
 
 extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        log("[LBT: CBCMD] DidUpdateState %{public}d",
-            log: OSLog.LittleBT_Log_CentralManager,
-            type: .debug,
-            arg: [central.state.rawValue])
-       _centralStatePublisher.send(BluetoothState(central.state))
+        logHandler?("Central state: \(BluetoothState(central.state))", .debug, .connection)
+        _centralStatePublisher.send(BluetoothState(central.state))
     }
-    
+
     /// Scan
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        log("[LBT: CBCMD] DidDiscover %{public}@",
-            log: OSLog.LittleBT_Log_CentralManager,
-            type: .debug,
-            arg: [peripheral.description])
+        logHandler?("Discovered \(peripheral.name ?? peripheral.identifier.uuidString)", .debug, .scan)
         let peripheraldiscovery = PeripheralDiscovery(peripheral, advertisement: advertisementData, rssi: RSSI)
         centralDiscoveriesPublisher.send(peripheraldiscovery)
     }
-    
+
     /// Monitoring connection
     func centralManager(_ central: CBCentralManager, didConnect: CBPeripheral) {
-        log("[LBT: CBCMD] DidConnect %{public}@",
-            log: OSLog.LittleBT_Log_CentralManager,
-            type: .debug,
-            arg: [didConnect.description])
+        logHandler?("didConnect \(didConnect.name ?? didConnect.identifier.uuidString)", .info, .connection)
         if isAutoconnectionActive {
             isAutoconnectionActive = false
             let event = ConnectionEvent.autoConnected(didConnect)
@@ -130,14 +120,8 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
             connectionEventPublisher.send(event)
         }
     }
-    
+
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: Error?) {
-        log("[LBT: CBCMD] DidDisconnect %{public}@, isReconnecting: %{public}d, Error %{public}@",
-            log: OSLog.LittleBT_Log_CentralManager,
-            type: .debug,
-            arg: [peripheral.description,
-            isReconnecting ? 1 : 0,
-            error?.localizedDescription ?? ""])
         logHandler?("didDisconnect \(peripheral.identifier), isReconnecting: \(isReconnecting), error: \(error?.localizedDescription ?? "none")", .info, .connection)
         isAutoconnectionActive = false
         var lttlError: LittleBluetoothError?
@@ -145,11 +129,11 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
             lttlError = .peripheralDisconnected(PeripheralIdentifier(peripheral: peripheral), error)
         }
         let event = ConnectionEvent.disconnected(peripheral, error: lttlError)
-        logHandler?("Sending .disconnected event", .debug, .connection)
         connectionEventPublisher.send(event)
     }
-    
+
     func centralManager(_ central: CBCentralManager, didFailToConnect: CBPeripheral, error: Error?) {
+        logHandler?("didFailToConnect \(didFailToConnect.identifier), error: \(error?.localizedDescription ?? "none")", .warning, .connection)
         isAutoconnectionActive = false
         var lttlError: LittleBluetoothError?
         if let error = error {
@@ -158,19 +142,14 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
         let event = ConnectionEvent.connectionFailed(didFailToConnect, error: lttlError)
         connectionEventPublisher.send(event)
     }
-    
+
     func centralManager(_ central: CBCentralManager, willRestoreState dict: [String : Any]) {
-        log("[LBT: CBCMD] WillRestoreState %{public}@",
-            log: OSLog.LittleBT_Log_Restore,
-            type: .debug,
-            arg: [dict.description])
+        logHandler?("willRestoreState", .info, .restore)
         _willRestoreStatePublisher.send(CentralRestorer(centralManager: central, restoredInfo: dict))
     }
-    
+
     #if !os(macOS)
     func centralManager(_ central: CBCentralManager, connectionEventDidOccur event: CBConnectionEvent, for peripheral: CBPeripheral) {}
     #endif
-    
-}
 
-extension CBCentralManagerDelegateProxy: Loggable {}
+}

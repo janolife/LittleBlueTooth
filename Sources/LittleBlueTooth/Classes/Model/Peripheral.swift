@@ -84,7 +84,13 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         }
         set {
             _isLogEnabled = newValue
-            peripheralProxy.isLogEnabled = newValue
+        }
+    }
+
+    /// Structured log handler, forwarded to the peripheral proxy
+    var logHandler: LBTLogHandler? {
+        didSet {
+            peripheralProxy.logHandler = logHandler
         }
     }
     
@@ -639,4 +645,3 @@ extension Peripheral: CustomDebugStringConvertible {
     }
 }
 
-extension Peripheral: Loggable {}

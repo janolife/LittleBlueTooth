@@ -366,6 +366,25 @@ class ReconnectionTest: LittleBlueToothTests {
         XCTAssertEqual(disconnectLogs.first?.level, .info)
     }
 
+    /// Verify proxy-level delegate events flow through structured logHandler
+    func testProxyLogsFlowThroughLogHandler() {
+        let logs = StructuredLogCollector()
+        var config = LittleBluetoothConfiguration()
+        config.logHandler = { message, level, category in
+            logs.append(message, level, category)
+        }
+        littleBT = LittleBlueTooth(with: config)
+
+        let connectedExp = connectBlinky()
+        wait(for: [connectedExp], timeout: 10)
+
+        // Proxy should have logged didConnect
+        let connectionProxyLogs = logs.messages.filter {
+            $0.category == .connection && $0.message.contains("didConnect")
+        }
+        XCTAssertFalse(connectionProxyLogs.isEmpty, "Proxy didConnect should flow through logHandler")
+    }
+
     /// Verify GATT operations produce gatt-category logs
     func testStructuredLogHandlerReceivesGATTLogs() {
         let logs = StructuredLogCollector()

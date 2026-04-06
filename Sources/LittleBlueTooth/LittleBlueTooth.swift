@@ -8,7 +8,6 @@
 
 import Foundation
 import Combine
-import os.log
 #if TEST
 @preconcurrency import CoreBluetoothMock
 #else
@@ -55,6 +54,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 return
             }
             per.isLogEnabled = isLogEnabled
+            per.logHandler = logHandler
         }
     }
     
@@ -103,7 +103,6 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         set {
             _isLogEnabled = newValue
-            centralProxy.isLogEnabled = newValue
         }
     }
     
@@ -209,12 +208,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         attachSubscribers(with: configuration.restoreHandler)
         self.isLogEnabled = configuration.isLogEnabled
-        log(
-            "[LBT] init options %{public}@",
-            log: OSLog.LittleBT_Log_General,
-            type: .debug,
-            arg: [configuration.centralManagerOptions?.description ?? ""]
-        )
+        emit("Initialized with options: \(configuration.centralManagerOptions?.description ?? "none")", .debug, .connection)
     }
     
     func attachSubscribers(with restorehandler: ((Restored) -> Void)?) {
@@ -269,7 +263,6 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                         let shouldReconnect = autoCon(periph, error)
                         self.logHandler?("Autoconnection handler returned \(shouldReconnect) for \(periph.id.uuidString)", .debug, .connection)
                         if shouldReconnect {
-                            os_log("[LBT] Autoconnection handler triggered for %@, initiating reconnect...", log: OSLog.LittleBT_Log_General, type: .info, periph.id.uuidString)
                             self.logHandler?("Initiating reconnect for \(periph.id.uuidString)", .info, .connection)
 
                             self.autoconnect(to: periph)
@@ -1048,10 +1041,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
               let restoreDiscoverServices = restorer.services
               let restoreScanOptions = restorer.scanOptions
               let restoreDiscoveryPublisher = self.startDiscovery(withServices: restoreDiscoverServices, options: restoreScanOptions)
-              log("[LBT] Scan restore %{public}@",
-                  log: OSLog.LittleBT_Log_Restore,
-                  type: .debug,
-                  arg: [restorer.centralManager.isScanning ? "true" : "false"])
+              emit("Scan restore, isScanning: \(restorer.centralManager.isScanning)", .info, .restore)
               return .scan(discoveryPublisher: restoreDiscoveryPublisher)
           }
           if let cbPeripheral = restorer.peripherals.first {
@@ -1092,12 +1082,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
               @unknown default:
                   fatalError("Connection event in default not handled")
               }
-              log("[LBT] Periph restore %{public}@, has delegate: %{public}@ state %{public}d",
-                  log: OSLog.LittleBT_Log_Restore,
-                  type: .debug,
-                  arg: [cbPeripheral.description,
-                  cbPeripheral.delegate != nil ? "true" : "false",
-                  cbPeripheral.state.rawValue])
+              emit("Peripheral restore: \(cbPeripheral.identifier), state: \(cbPeripheral.state.rawValue), hasDelegate: \(cbPeripheral.delegate != nil)", .info, .restore)
               return Restored.peripheral(self.peripheral!)
           }
           return Restored.nothing
@@ -1226,4 +1211,3 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     
 }
 
-extension LittleBlueTooth: Loggable {}
