@@ -86,6 +86,7 @@ final class CBCentralManagerDelegateProxy: NSObject {
 
     var isLogEnabled: Bool = false
     var isAutoconnectionActive = false
+    var logHandler: (@Sendable (_ message: String) -> Void)?
     var stateRestorationCancellable: AnyCancellable!
     
     override init() {
@@ -137,12 +138,14 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
             arg: [peripheral.description,
             isReconnecting ? 1 : 0,
             error?.localizedDescription ?? ""])
+        logHandler?("[LBT:Proxy] didDisconnect \(peripheral.identifier), isReconnecting: \(isReconnecting), error: \(error?.localizedDescription ?? "none")")
         isAutoconnectionActive = false
         var lttlError: LittleBluetoothError?
         if let error = error {
             lttlError = .peripheralDisconnected(PeripheralIdentifier(peripheral: peripheral), error)
         }
         let event = ConnectionEvent.disconnected(peripheral, error: lttlError)
+        logHandler?("[LBT:Proxy] Sending .disconnected event")
         connectionEventPublisher.send(event)
     }
     

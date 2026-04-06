@@ -26,11 +26,20 @@ public struct LittleBluetoothConfiguration {
     /// When a connection will be established an `.autoConnected(PeripheralIdentifier)` event will be streamed to
     /// the `connectionEventPublisher`
     public var autoconnectionHandler: AutoconnectionHandler?
+    /// Connection options passed to `CBCentralManager.connect(_:options:)` during
+    /// autoconnection attempts. Use this to configure keys such as
+    /// `CBConnectPeripheralOptionStartDelayKey` or the background notification options.
+    /// When `nil`, no options are passed (preserving existing behavior).
+    public var autoconnectionOptions: [String : Any]?
     /// Handler used to manage state restoration. `Restored` object will contain the restored information
     /// could be a peripheral, a scan or nothing
     public var restoreHandler: ((Restored) -> Void)?
     /// Enable logging, log is made using os_log and it exposes some information even in release configuration
     public var isLogEnabled = false
-    
+    /// Optional external log handler called for key connection lifecycle events
+    /// (autoconnection triggers, failures, state changes). Use this to bridge
+    /// LittleBlueTooth logs into your app's logging pipeline.
+    public var logHandler: (@Sendable (_ message: String) -> Void)?
+
     public init() {}
 }
