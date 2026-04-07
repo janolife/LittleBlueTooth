@@ -120,6 +120,13 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     private var _isLogEnabled: Bool = false
     private var disposeBag = [UUID : AnyCancellable]()
 
+    /// Re-set the CBPeripheral delegate to this Peripheral's proxy.
+    /// Call after ensuring all old Peripheral references are released,
+    /// to prevent a deferred ARC deallocation from clearing the weak delegate.
+    func reassertDelegate() {
+        cbPeripheral.delegate = peripheralProxy
+    }
+
     /// Initialize a `Peripheral` using a `CBperipheral`
     /// It also attach the publisher to monitor the state of the peripheral
     init(_ peripheral: CBPeripheral) {
