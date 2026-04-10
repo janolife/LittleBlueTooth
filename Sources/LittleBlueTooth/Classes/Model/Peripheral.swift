@@ -152,7 +152,9 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     }
 
     deinit {
-        cbPeripheral.delegate = nil
+        if cbPeripheral.delegate === peripheralProxy {
+            cbPeripheral.delegate = nil
+        }
     }
 
     private func removeAndCancelSubscriber(for key: UUID) {
