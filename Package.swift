@@ -23,8 +23,7 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(name: "CoreBluetoothMock",
-                 url: "https://github.com/NordicSemiconductor/IOS-CoreBluetooth-Mock.git",
+        .package(url: "https://github.com/NordicSemiconductor/IOS-CoreBluetooth-Mock.git",
                  .upToNextMinor(from: "1.0.4")),
     ],
     targets: [
@@ -37,13 +36,13 @@ let package = Package(
         ),
         .target(
             name: "LittleBlueToothForTest",
-            dependencies: ["CoreBluetoothMock"],
+            dependencies: [.product(name: "CoreBluetoothMock", package: "IOS-CoreBluetooth-Mock")],
             exclude: ["Info.plist"],
             swiftSettings: [.define("TEST")]
         ),
         .testTarget(
             name: "LittleBlueToothTests",
-            dependencies: ["LittleBlueToothForTest","CoreBluetoothMock"],
+            dependencies: ["LittleBlueToothForTest", .product(name: "CoreBluetoothMock", package: "IOS-CoreBluetooth-Mock")],
             exclude: ["Info.plist"]
         )
     ]

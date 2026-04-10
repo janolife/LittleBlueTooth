@@ -2,17 +2,20 @@
 //  Log.swift
 //  LittleBlueTooth
 //
-//  Created by Andrea Finollo on 29/01/21.
-//
 
 import Foundation
 import Combine
 
+extension LittleBlueTooth {
+    /// Emit a structured log message through the logHandler.
+    func emit(_ message: String, _ level: LBTLogLevel, _ category: LBTLogCategory) {
+        logHandler?(message, level, category)
+    }
+}
+
 extension Publisher {
-    func customPrint(_ prefix: String = "", to: TextOutputStream? = nil, isEnabled: Bool = true) -> AnyPublisher<Self.Output, Self.Failure> {
-        if isEnabled {
-            return print(prefix, to: to).eraseToAnyPublisher()
-        }
-        return AnyPublisher(self)
+    /// Log a message through LittleBlueTooth's structured logHandler when this publisher is subscribed to.
+    func log(_ lbt: LittleBlueTooth, _ message: @autoclosure @escaping () -> String, _ level: LBTLogLevel, _ category: LBTLogCategory) -> Publishers.HandleEvents<Self> {
+        handleEvents(receiveSubscription: { _ in lbt.emit(message(), level, category) })
     }
 }

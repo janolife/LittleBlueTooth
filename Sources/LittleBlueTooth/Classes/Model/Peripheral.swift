@@ -84,7 +84,13 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         }
         set {
             _isLogEnabled = newValue
-            peripheralProxy.isLogEnabled = newValue
+        }
+    }
+
+    /// Structured log handler, forwarded to the peripheral proxy
+    var logHandler: LBTLogHandler? {
+        didSet {
+            peripheralProxy.logHandler = logHandler
         }
     }
     
@@ -113,6 +119,13 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     private let peripheralProxy = CBPeripheralDelegateProxy()
     private var _isLogEnabled: Bool = false
     private var disposeBag = [UUID : AnyCancellable]()
+
+    /// Re-set the CBPeripheral delegate to this Peripheral's proxy.
+    /// Call after ensuring all old Peripheral references are released,
+    /// to prevent a deferred ARC deallocation from clearing the weak delegate.
+    func reassertDelegate() {
+        cbPeripheral.delegate = peripheralProxy
+    }
 
     /// Initialize a `Peripheral` using a `CBperipheral`
     /// It also attach the publisher to monitor the state of the peripheral
@@ -240,13 +253,11 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         let discovery = Deferred {
             Future<[CBCharacteristic], LittleBluetoothError> { [unowned self, futKey] promise in
                 self.getService(serviceUUID: serviceUUID)
-                    .customPrint("[LBT] Discover service", isEnabled: isLogEnabled)
-                    .flatMap { services -> AnyPublisher<CBService, LittleBluetoothError> in
+                                        .flatMap { services -> AnyPublisher<CBService, LittleBluetoothError> in
                         let service = services!.filter{ $0.uuid == serviceUUID}.first!
                         return self.getCharateristics(characteristicUUIDs: charateristicUUIDs, from: service)
                     }
-                    .customPrint("[LBT] Discover characteristic", isEnabled: isLogEnabled)
-                    .filter { (service) -> Bool in
+                                        .filter { (service) -> Bool in
                         if charateristicUUIDs == nil {
                             return true
                         } else if let characteristics = service.characteristics?.map({$0.uuid}),
@@ -641,4 +652,3 @@ extension Peripheral: CustomDebugStringConvertible {
     }
 }
 
-extension Peripheral: Loggable {}

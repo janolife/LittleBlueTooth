@@ -7,7 +7,6 @@
 
 import Foundation
 import Combine
-import os.log
 #if TEST
 import CoreBluetoothMock
 #else
@@ -30,24 +29,11 @@ extension Publisher {
 extension TimeInterval {
     /// Get a `DispatchTimeInterval` from a TimeInterval.
     public var dispatchInterval: DispatchTimeInterval {
-        let microseconds = Int64(self * TimeInterval(USEC_PER_SEC)) // perhaps use nanoseconds, though would more often be > Int.max
+        let microseconds = Int64(self * TimeInterval(USEC_PER_SEC))
         return microseconds < Int.max ? DispatchTimeInterval.microseconds(Int(microseconds)) : DispatchTimeInterval.seconds(Int(self))
     }
 }
 
-extension OSLog {
-    public static let Subsystem = "it.vanillagorilla.LittleBlueTooth"
-    public static let General = "General"
-    public static let CentralManager = "CentralManager"
-    public static let Peripheral = "Peripheral"
-    public static let Restore = "Restore"
-
-    public static let LittleBT_Log_General = OSLog(subsystem: Subsystem, category: General)
-    public static let LittleBT_Log_CentralManager = OSLog(subsystem: Subsystem, category: CentralManager)
-    public static let LittleBT_Log_Peripheral = OSLog(subsystem: Subsystem, category: Peripheral)
-    public static let LittleBT_Log_Restore = OSLog(subsystem: Subsystem, category: Restore)
-
-}
 #if TEST
 extension CBMPeripheral {
     public var description: String {
