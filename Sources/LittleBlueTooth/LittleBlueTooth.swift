@@ -112,8 +112,9 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     /// The original CBPeripheral from state restoration. Survives disconnect cleanup
     /// so reconnection can reuse it instead of retrieving a new proxy.
     private var restoredCBPeripheral: CBPeripheral?
-    /// Cancellable operation idendified by a `UUID` key
-    private var disposeBag = [UUID : AnyCancellable]()
+    /// Cancellable operation idendified by a `UUID` key. Thread-safe:
+    /// the central manager queue and caller queues both mutate it.
+    private let disposeBag = SubscriptionBag()
     /// Scan cancellable operation
     private var scanning: AnyCancellable?
     /// Peripheral state  publisher. It will be created after `Peripheral` instance creation.
@@ -299,17 +300,14 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     
     deinit {
         print("Deinit: \(self)")
-        disposeBag.forEach { (_, value) in
-            value.cancel()
-        }
+        disposeBag.cancelAll()
         scanning?.cancel()
         connectionEventSubscriber?.cancel()
-        disposeBag.removeAll()
         guard let peri = peripheral else {
             return
         }
         cbCentral.cancelPeripheralConnection(peri.cbPeripheral)
-        
+
     }
     // MARK: - Peripheral state bridge
 
@@ -395,7 +393,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             rssiSubject.send(completion: .finished)
             self.removeAndCancelSubscriber(for: key)
         }
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         return rssiSubject.eraseToAnyPublisher()
     }
@@ -516,7 +514,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             startListenSubject.send(completion: .finished)
             self.removeAndCancelSubscriber(for: key)
         }
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         return startListenSubject.eraseToAnyPublisher()
     }
@@ -550,7 +548,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             stopSubject.send(completion: .finished)
             self.removeAndCancelSubscriber(for: key)
         }
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         return stopSubject.eraseToAnyPublisher()
     }
@@ -598,7 +596,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 readSubject.send(completion: .finished)
                 self.removeAndCancelSubscriber(for: futKey)
             }
-            .store(in: &disposeBag, for: futKey)
+            .store(in: disposeBag, for: futKey)
         
         return readSubject.eraseToAnyPublisher()
     }
@@ -638,7 +636,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             writeSubject.send(completion: .finished)
             self.removeAndCancelSubscriber(for: key)
         })
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         return writeSubject.eraseToAnyPublisher()
     }
@@ -686,7 +684,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             writeListenSubject.send(completion: .finished)
             self.removeAndCancelSubscriber(for: key)
         }
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         return writeListenSubject.eraseToAnyPublisher()
     }
@@ -875,7 +873,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             connectSubject.send(completion: .finished)
             self.removeAndCancelSubscriber(for: key)
         })
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         return connectSubject.eraseToAnyPublisher()
     }
@@ -914,7 +912,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 // Everything is cleaned in the connection event observer
             }
         }
-        .store(in: &disposeBag, for: key)
+        .store(in: disposeBag, for: key)
         
         self.cbCentral.cancelPeripheralConnection(peripheral!.cbPeripheral)
         return disconnectionSubject.eraseToAnyPublisher()
@@ -977,7 +975,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 discoverSubject.send(completion: .finished)
                 self.removeAndCancelSubscriber(for: futKey)
             }
-            .store(in: &disposeBag, for: futKey)
+            .store(in: disposeBag, for: futKey)
         return discoverSubject.eraseToAnyPublisher()
     }
     
@@ -1015,7 +1013,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 discoverSubject.send(completion: .finished)
                 self.removeAndCancelSubscriber(for: futKey)
             }
-            .store(in: &disposeBag, for: futKey)
+            .store(in: disposeBag, for: futKey)
         return discoverSubject.eraseToAnyPublisher()
     }
     
@@ -1049,7 +1047,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 l2capSubject.send(completion: .finished)
                 self.removeAndCancelSubscriber(for: key)
             }
-            .store(in: &disposeBag, for: key)
+            .store(in: disposeBag, for: key)
 
         return l2capSubject.eraseToAnyPublisher()
     }
@@ -1097,7 +1095,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                           self.centralProxy.isAutoconnectionActive = true
                           self.cbCentral.connect(cbPeripheral, options: nil)
                       }
-                      .store(in: &self.disposeBag, for: UUID())
+                      .store(in: self.disposeBag, for: UUID())
               case .disconnected:
                   self.connectPeripheralStatePublisher()
                   emit("Restore: peripheral is .disconnected — autoconnection handler will fire if set", .info, .restore)
@@ -1157,7 +1155,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                     prom(.success(state))
                     self.removeAndCancelSubscriber(for: futKey)
                 }
-                .store(in: &self.disposeBag, for: futKey)
+                .store(in: self.disposeBag, for: futKey)
             }
         }
         return future.eraseToAnyPublisher()
@@ -1203,9 +1201,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     }
     
     private func removeAndCancelSubscriber(for key: UUID) {
-        let sub = disposeBag[key]
-        sub?.cancel()
-        disposeBag.removeValue(forKey: key)
+        disposeBag.remove(key)
     }
     
     func cleanUpForDisconnection() {
