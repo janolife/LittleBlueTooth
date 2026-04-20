@@ -1,7 +1,9 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
+
+let swift6: [SwiftSetting] = [.swiftLanguageMode(.v6)]
 
 let package = Package(
     name: "LittleBlueTooth",
@@ -32,18 +34,20 @@ let package = Package(
         .target(
             name: "LittleBlueTooth",
             dependencies: [],
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist"],
+            swiftSettings: swift6
         ),
         .target(
             name: "LittleBlueToothForTest",
             dependencies: [.product(name: "CoreBluetoothMock", package: "IOS-CoreBluetooth-Mock")],
             exclude: ["Info.plist"],
-            swiftSettings: [.define("TEST")]
+            swiftSettings: swift6 + [.define("TEST")]
         ),
         .testTarget(
             name: "LittleBlueToothTests",
             dependencies: ["LittleBlueToothForTest", .product(name: "CoreBluetoothMock", package: "IOS-CoreBluetooth-Mock")],
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist"],
+            swiftSettings: swift6
         )
     ]
 )

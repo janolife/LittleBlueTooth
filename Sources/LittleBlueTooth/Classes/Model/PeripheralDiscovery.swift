@@ -8,9 +8,9 @@
 
 import Foundation
 #if TEST
-@preconcurrency import  CoreBluetoothMock
+import  CoreBluetoothMock
 #else
-@preconcurrency import CoreBluetooth
+import CoreBluetooth
 #endif
 
 
@@ -20,6 +20,10 @@ public protocol PeripheralIdentifiable: Identifiable {
     var name: String? {get set}
 }
 /// An object that contains the unique identifier of the `CBPeripheral` and the name of it (if present)
+// Safety: `cbPeripheral` is an optional non-Sendable Cocoa reference. In practice
+// this struct is constructed from a CBPeripheral retained elsewhere (the
+// `LittleBlueTooth` / `Peripheral` wrapper), and the stored reference is never
+// mutated after init. Accesses happen on whichever queue retains it.
 public struct PeripheralIdentifier: PeripheralIdentifiable, @unchecked Sendable {
     /// The `UUID`of the peripheral
     public var id: UUID

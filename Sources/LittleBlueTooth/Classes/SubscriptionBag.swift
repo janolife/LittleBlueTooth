@@ -11,6 +11,9 @@
 import Foundation
 import Combine
 
+// Safety: every access to `storage` is serialized by `lock`.
+// `AnyCancellable` is Sendable; `os_unfair_lock` is safe across threads.
+// Cancellation runs outside the critical section to prevent re-entrant deadlock.
 final class SubscriptionBag: @unchecked Sendable {
 
     private var storage: [UUID: AnyCancellable] = [:]

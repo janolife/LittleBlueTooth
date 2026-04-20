@@ -27,6 +27,14 @@ public protocol Writable {
 Please note that Apple do not enacourage the use of more `CBCentralManger` instances, due to resurce hits.
  [Link](https://developer.apple.com/forums/thread/20810)
  */
+// Safety: holds a `CBCentralManager` (non-Sendable Cocoa class) whose delegate
+// callbacks fire on the queue passed at init (default: main). Mutable state —
+// `peripheral`, the various `*Cancellable` fields, the autoconnection handler —
+// is only mutated inside sinks delivered on that queue or inside methods the
+// caller invokes synchronously from the main thread. The `disposeBag` is a
+// lock-guarded `SubscriptionBag`. @unchecked Sendable is a runtime contract,
+// not a compile-time proof; do not expose new concurrent writers to this state
+// without serialization.
 public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     
     // MARK: - Public variables
