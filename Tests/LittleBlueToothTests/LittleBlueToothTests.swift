@@ -17,13 +17,12 @@ class LittleBlueToothTests: XCTestCase {
     var disposeBag: Set<AnyCancellable> = []
     nonisolated(unsafe) static var testInitialized: Bool = false
     
-    override func setUpWithError() throws {
-        try super.setUpWithError()
+    override func setUp() async throws {
+        try await super.setUp()
         if !Self.testInitialized {
             CBMCentralManagerMock.simulatePeripherals([blinky, blinkyWOR])
             Self.testInitialized = true
         }
         CBMCentralManagerMock.simulateInitialState(.poweredOn)
-
     }
 }
