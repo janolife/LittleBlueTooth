@@ -20,10 +20,12 @@ public protocol PeripheralIdentifiable: Identifiable {
     var name: String? {get set}
 }
 /// An object that contains the unique identifier of the `CBPeripheral` and the name of it (if present)
-// Safety: `cbPeripheral` is an optional non-Sendable Cocoa reference. In practice
-// this struct is constructed from a CBPeripheral retained elsewhere (the
-// `LittleBlueTooth` / `Peripheral` wrapper), and the stored reference is never
-// mutated after init. Accesses happen on whichever queue retains it.
+// @unchecked Sendable is a runtime contract, not a compile-time proof. This
+// struct holds an optional non-Sendable `CBPeripheral` reference that is
+// typically set at init from a CBPeripheral retained elsewhere (the
+// `LittleBlueTooth` / `Peripheral` wrapper). `cbPeripheral` is declared
+// `public var` for legacy API reasons; callers are expected — but not forced —
+// to treat it as write-once. Concurrent reassignment is undefined behavior.
 public struct PeripheralIdentifier: PeripheralIdentifiable, @unchecked Sendable {
     /// The `UUID`of the peripheral
     public var id: UUID
