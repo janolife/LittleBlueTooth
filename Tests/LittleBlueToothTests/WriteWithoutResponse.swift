@@ -13,11 +13,12 @@ import Combine
 class WriteWithoutResponse: LittleBlueToothTests {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-        try super.setUpWithError()
-        var lttlCon = LittleBluetoothConfiguration()
-        lttlCon.isLogEnabled = true
-        littleBT = LittleBlueTooth(with: lttlCon)
+        try MainActor.assumeIsolated {
+            try super.setUpWithError()
+            var lttlCon = LittleBluetoothConfiguration()
+            lttlCon.isLogEnabled = true
+            littleBT = LittleBlueTooth(with: lttlCon)
+        }
     }
 
     override func tearDownWithError() throws {

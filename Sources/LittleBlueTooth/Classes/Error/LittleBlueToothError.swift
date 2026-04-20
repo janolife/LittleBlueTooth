@@ -45,3 +45,6 @@ public enum LittleBluetoothError: Error {
     case fullfillConditionNotRespected
     case deserializationFailedDataOfBounds(start: Int, length: Int, count: Int)
 }
+
+// CBUUID is an immutable NSCopying Obj-C class with no mutable state; safe to share across threads.
+extension CBUUID: @unchecked @retroactive Sendable {}
