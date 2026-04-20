@@ -55,11 +55,15 @@ public enum PeripheralState: Sendable {
 }
 
 /// It represents a peripheral along with its properties
-// Safety: wraps a `CBPeripheral` whose delegate callbacks are dispatched on the
-// owning `CBCentralManager`'s queue. Combine pipelines built here deliver on
-// that queue. The internal `SubscriptionBag` is lock-guarded, and `cbPeripheral`
-// is set once at init and not mutated. Users of this type must not mutate its
-// stored Combine publishers from background queues — the public API is read-only.
+// @unchecked Sendable is a runtime contract, not a compile-time proof. This
+// type wraps a `CBPeripheral` whose delegate callbacks are dispatched on the
+// owning `CBCentralManager`'s queue. The internal `SubscriptionBag` is
+// lock-guarded, and `cbPeripheral` is set once at init and never reassigned.
+//
+// Publicly mutable properties (`skipServiceCache`, `isLogEnabled`, `logHandler`)
+// are not isolated. Callers are expected — but not forced — to assign them
+// from a single thread, typically during setup. Concurrent assignment from
+// multiple threads is undefined behavior.
 public final class Peripheral: Identifiable, @unchecked Sendable {
     /// An identifier for the peripheral it is the same as the wrapped `CBPeripheral`
     public var id: UUID {

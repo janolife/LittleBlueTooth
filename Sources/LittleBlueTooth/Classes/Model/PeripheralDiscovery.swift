@@ -8,7 +8,7 @@
 
 import Foundation
 #if TEST
-import  CoreBluetoothMock
+import CoreBluetoothMock
 #else
 import CoreBluetooth
 #endif
