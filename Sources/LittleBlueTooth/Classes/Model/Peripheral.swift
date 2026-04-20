@@ -118,7 +118,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     
     private let peripheralProxy = CBPeripheralDelegateProxy()
     private var _isLogEnabled: Bool = false
-    private var disposeBag = [UUID : AnyCancellable]()
+    private let disposeBag = SubscriptionBag()
 
     /// Re-set the CBPeripheral delegate to this Peripheral's proxy.
     /// Call after ensuring all old Peripheral references are released,
@@ -158,9 +158,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
     }
 
     private func removeAndCancelSubscriber(for key: UUID) {
-        let sub = disposeBag[key]
-        sub?.cancel()
-        disposeBag.removeValue(forKey: key)
+        disposeBag.remove(key)
     }
     
     func getService(serviceUUID: CBUUID?) -> AnyPublisher<[CBService]?, LittleBluetoothError> {
@@ -199,7 +197,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                             promise(.success(service))
                             self.removeAndCancelSubscriber(for: futKey)
                         }
-                        .store(in: &self.disposeBag, for: futKey)
+                        .store(in: self.disposeBag, for: futKey)
                 }
             }
             .eraseToAnyPublisher()
@@ -290,7 +288,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(characteristics))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &self.disposeBag, for: futKey)
+                    .store(in: self.disposeBag, for: futKey)
             }
         }.eraseToAnyPublisher()
         
@@ -323,7 +321,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(readvalue))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &disposeBag, for: futKey)
+                    .store(in: disposeBag, for: futKey)
             }
         }
         .eraseToAnyPublisher()
@@ -374,7 +372,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(readvalue))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &disposeBag, for: futKey)
+                    .store(in: disposeBag, for: futKey)
             }
         }
         .eraseToAnyPublisher()
@@ -437,7 +435,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(readvalue))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &disposeBag, for: futKey)
+                    .store(in: disposeBag, for: futKey)
             }
         }
         .eraseToAnyPublisher()
@@ -483,7 +481,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(charact))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &self.disposeBag, for: futKey)
+                    .store(in: self.disposeBag, for: futKey)
             }
             
         }
@@ -531,7 +529,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(charact))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &self.disposeBag, for: futKey)
+                    .store(in: self.disposeBag, for: futKey)
             }
         }
         .eraseToAnyPublisher()
@@ -585,7 +583,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(charact))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &self.disposeBag, for: futKey)
+                    .store(in: self.disposeBag, for: futKey)
             }
         }
         .eraseToAnyPublisher()
@@ -622,7 +620,7 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         promise(.success(channel))
                         self.removeAndCancelSubscriber(for: futKey)
                     }
-                    .store(in: &self.disposeBag, for: futKey)
+                    .store(in: self.disposeBag, for: futKey)
             }
         }
         .eraseToAnyPublisher()

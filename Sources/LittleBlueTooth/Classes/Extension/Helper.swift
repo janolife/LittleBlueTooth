@@ -13,12 +13,6 @@ import CoreBluetoothMock
 import CoreBluetooth
 #endif
 
-extension AnyCancellable {
-  func store(in dictionary: inout [UUID : AnyCancellable],
-             for key: UUID) {
-    dictionary[key] = self
-  }
-}
 extension Publisher {
     /// Republishes elements sent by the most recently received publisher.
    func flatMapLatest<T: Publisher>(_ transform: @escaping (Self.Output) -> T) -> AnyPublisher<T.Output, T.Failure> where T.Failure == Self.Failure {

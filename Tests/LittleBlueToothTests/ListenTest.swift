@@ -25,16 +25,11 @@ struct ButtonState: Readable {
 class ListenTest: LittleBlueToothTests {
     var cancellable: Cancellable?
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-        try super.setUpWithError()
+    override func setUp() async throws {
+        try await super.setUp()
         var configuration = LittleBluetoothConfiguration()
         configuration.isLogEnabled = true
         littleBT = LittleBlueTooth(with: configuration)
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
     
     func testListen() {

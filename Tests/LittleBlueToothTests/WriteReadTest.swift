@@ -23,16 +23,11 @@ struct LedState: Readable {
 
 class ReadWriteTest: LittleBlueToothTests {
     
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-        try super.setUpWithError()
+    override func setUp() async throws {
+        try await super.setUp()
         var configuration = LittleBluetoothConfiguration()
         configuration.isLogEnabled = true
         littleBT = LittleBlueTooth(with: configuration)
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
     
     func testWrongServiceError() {
@@ -74,7 +69,7 @@ class ReadWriteTest: LittleBlueToothTests {
                 }
             }
         }) { (answer) in
-            print("Answer \(answer)")
+            print("Answer \(String(describing: answer))")
         }
         .store(in: &disposeBag)
         
@@ -104,7 +99,7 @@ class ReadWriteTest: LittleBlueToothTests {
         .sink(receiveCompletion: { completion in
             print("Completion \(completion)")
         }) { (answer) in
-            print("Answer \(answer)")
+            print("Answer \(String(describing: answer))")
             servicesCount = answer?.count ?? 0
             self.littleBT.disconnect().sink(receiveCompletion: {_ in
             }) { (_) in
@@ -141,7 +136,7 @@ class ReadWriteTest: LittleBlueToothTests {
         .sink(receiveCompletion: { completion in
             print("Completion \(completion)")
         }) { (answer) in
-            print("Answer \(answer)")
+            print("Answer \(String(describing: answer))")
             characteristicsCount = answer?.count ?? 0
             self.littleBT.disconnect().sink(receiveCompletion: {_ in
             }) { (_) in
@@ -180,7 +175,7 @@ class ReadWriteTest: LittleBlueToothTests {
         .sink(receiveCompletion: { completion in
             print("Completion \(completion)")
         }) { (answer) in
-            print("Answer \(answer)")
+            print("Answer \(String(describing: answer))")
             ledState = answer
             self.littleBT.disconnect().sink(receiveCompletion: {_ in
             }) { (_) in
@@ -221,7 +216,7 @@ class ReadWriteTest: LittleBlueToothTests {
         .sink(receiveCompletion: { completion in
             print("Completion \(completion)")
         }) { (answer) in
-            print("Answer \(answer)")
+            print("Answer \(String(describing: answer))")
             ledState = answer
             self.littleBT.disconnect().sink(receiveCompletion: {_ in
             }) { (_) in
@@ -364,7 +359,7 @@ class ReadWriteTest: LittleBlueToothTests {
                 }
             }
         }) { (answer) in
-            print("Answer \(answer)")
+            print("Answer \(String(describing: answer))")
         }
         .store(in: &disposeBag)
 
