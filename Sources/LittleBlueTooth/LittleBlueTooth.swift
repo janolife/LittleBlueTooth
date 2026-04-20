@@ -112,7 +112,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
     /// The original CBPeripheral from state restoration. Survives disconnect cleanup
     /// so reconnection can reuse it instead of retrieving a new proxy.
     private var restoredCBPeripheral: CBPeripheral?
-    /// Cancellable operation idendified by a `UUID` key. Thread-safe:
+    /// Cancellable operation identified by a `UUID` key. Thread-safe:
     /// the central manager queue and caller queues both mutate it.
     private let disposeBag = SubscriptionBag()
     /// Scan cancellable operation

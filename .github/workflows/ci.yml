@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-and-test:
+    runs-on: macos-26-xlarge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build and test
+        run: swift test
+
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            EMOJI=":white_check_mark:"
+            STATUS="passed"
+          else
+            EMOJI=":x:"
+            STATUS="failed"
+          fi
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"${EMOJI} *${{ github.repository }}*: CI ${STATUS} for <${PR_URL}|${PR_TITLE}>\"}" \
+            "$SLACK_WEBHOOK_URL"
