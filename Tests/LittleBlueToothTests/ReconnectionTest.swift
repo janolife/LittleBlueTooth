@@ -64,6 +64,14 @@ class ReconnectionTest: LittleBlueToothTests {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
+        // Reset the mock's global state between tests. Autoconnection leaves
+        // pending cbCentral.connect() requests alive on the previous test's
+        // CBMCentralManager; without a full reset those linger and interfere
+        // with the next test's discovery/connection flow.
+        CBMCentralManagerMock.tearDownSimulation()
+        CBMCentralManagerMock.simulatePeripherals([blinky, blinkyWOR])
+        CBMCentralManagerMock.simulateInitialState(.poweredOn)
+
         // Ensure clean state — blinky out of range, not connected
         blinky.simulateProximityChange(.outOfRange)
         var configuration = LittleBluetoothConfiguration()

@@ -363,7 +363,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
 
         // Fire-and-forget. CB keeps this request alive indefinitely.
         // didConnect → connectionEventPublisher → attachSubscribers handles the rest.
-        emit("autoconnect: calling cbCentral.connect", .debug, .connection)
+        emit("autoconnect: calling cbCentral.connect with options: \(autoconnectionOptions ?? [:])", .debug, .connection)
         self.cbCentral.connect(cbPeripheral, options: autoconnectionOptions)
     }
 
