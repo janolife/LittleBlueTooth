@@ -874,10 +874,18 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             self.removeAndCancelSubscriber(for: key)
         })
         .store(in: disposeBag, for: key)
-        
-        return connectSubject.eraseToAnyPublisher()
+
+        return connectSubject
+            .handleEvents(receiveCancel: { [unowned self] in
+                if let periph = self.peripheral {
+                    self.emit("connect(): subscriber cancelled — cancelling CB pending connect", .debug, .connection)
+                    self.cbCentral.cancelPeripheralConnection(periph.cbPeripheral)
+                    self.peripheral = nil
+                }
+            })
+            .eraseToAnyPublisher()
     }
-    
+
     // MARK: - Disconnect
 
     /// Disconnect the connected `Peripheral`
