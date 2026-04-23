@@ -135,8 +135,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 .flatMapLatest { [unowned self] _ in
                     self.ensurePeripheralReady()
                 }
-                .flatMapLatest { [unowned self] _ in
-                    self.peripheral!.listenPublisher
+                .flatMapLatest { [unowned self] _ -> AnyPublisher<CBCharacteristic, LittleBluetoothError> in
+                    guard let peri = self.peripheral else {
+                        return Fail(error: .peripheralNotConnectedOrAlreadyDisconnected).eraseToAnyPublisher()
+                    }
+                    return peri.listenPublisher
                 }
                 .share()
                 .eraseToAnyPublisher()
@@ -377,8 +380,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         .flatMap { [unowned self] _ in
             self.ensurePeripheralReady()
         }
-        .flatMap { [unowned self] _ in
-            self.peripheral!.readRSSI()
+        .flatMap { [unowned self] _ -> AnyPublisher<Int, LittleBluetoothError> in
+            guard let peri = self.peripheral else {
+                return Fail(error: .peripheralNotConnectedOrAlreadyDisconnected).eraseToAnyPublisher()
+            }
+            return peri.readRSSI()
         }
         .sink(receiveCompletion: { [unowned self, key] (completion) in
             switch completion {
@@ -922,7 +928,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         .store(in: disposeBag, for: key)
         
-        self.cbCentral.cancelPeripheralConnection(peripheral!.cbPeripheral)
+        self.cbCentral.cancelPeripheralConnection(periph.cbPeripheral)
         return disconnectionSubject.eraseToAnyPublisher()
     }
     
