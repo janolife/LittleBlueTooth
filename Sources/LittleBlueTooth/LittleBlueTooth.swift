@@ -135,8 +135,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
                 .flatMapLatest { [unowned self] _ in
                     self.ensurePeripheralReady()
                 }
-                .flatMapLatest { [unowned self] _ in
-                    self.peripheral!.listenPublisher
+                .flatMapLatest { [unowned self] _ -> AnyPublisher<CBCharacteristic, LittleBluetoothError> in
+                    guard let peri = self.peripheral else {
+                        return Fail(error: .peripheralNotConnectedOrAlreadyDisconnected).eraseToAnyPublisher()
+                    }
+                    return peri.listenPublisher
                 }
                 .share()
                 .eraseToAnyPublisher()
@@ -377,8 +380,11 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         .flatMap { [unowned self] _ in
             self.ensurePeripheralReady()
         }
-        .flatMap { [unowned self] _ in
-            self.peripheral!.readRSSI()
+        .flatMap { [unowned self] _ -> AnyPublisher<Int, LittleBluetoothError> in
+            guard let peri = self.peripheral else {
+                return Fail(error: .peripheralNotConnectedOrAlreadyDisconnected).eraseToAnyPublisher()
+            }
+            return peri.readRSSI()
         }
         .sink(receiveCompletion: { [unowned self, key] (completion) in
             switch completion {
@@ -825,28 +831,31 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             }
         }
         .prefix(1)
-        .tryMap { [unowned self] (event) -> CBPeripheral in
+        .tryMap { [unowned self] (event) -> Peripheral in
             switch event {
-            case .ready(let periph):
-                return periph
+            case .ready:
+                guard let peripheral = self.peripheral else {
+                    throw LittleBluetoothError.peripheralNotConnectedOrAlreadyDisconnected
+                }
+                return peripheral
             case .notReady(_, let error?):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw error
             case .connectionFailed(_, let error?):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw error
             case .connectionFailed(let periph, _):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw LittleBluetoothError.couldNotConnectToPeripheral(PeripheralIdentifier(peripheral: periph), nil)
             case .disconnected(_, let error?):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw error
             case .disconnected(let periph, _):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw LittleBluetoothError.peripheralDisconnected(PeripheralIdentifier(peripheral: periph), nil)
             default:
@@ -855,9 +864,6 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         .mapError { (error) -> LittleBluetoothError in
                 error as! LittleBluetoothError
-        }
-        .map { [unowned self] peripheral -> Peripheral in
-            return self.peripheral!
         }
         .sink(receiveCompletion: { [unowned self, key] (completion) in
             switch completion {
@@ -874,10 +880,18 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             self.removeAndCancelSubscriber(for: key)
         })
         .store(in: disposeBag, for: key)
-        
-        return connectSubject.eraseToAnyPublisher()
+
+        return connectSubject
+            .handleEvents(receiveCancel: { [unowned self] in
+                if let periph = self.peripheral {
+                    self.emit("connect(): subscriber cancelled — cancelling CB pending connect", .debug, .connection)
+                    self.cbCentral.cancelPeripheralConnection(periph.cbPeripheral)
+                    self.peripheral = nil
+                }
+            })
+            .eraseToAnyPublisher()
     }
-    
+
     // MARK: - Disconnect
 
     /// Disconnect the connected `Peripheral`
@@ -914,7 +928,7 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         .store(in: disposeBag, for: key)
         
-        self.cbCentral.cancelPeripheralConnection(peripheral!.cbPeripheral)
+        self.cbCentral.cancelPeripheralConnection(periph.cbPeripheral)
         return disconnectionSubject.eraseToAnyPublisher()
     }
     
