@@ -825,28 +825,31 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
             }
         }
         .prefix(1)
-        .tryMap { [unowned self] (event) -> CBPeripheral in
+        .tryMap { [unowned self] (event) -> Peripheral in
             switch event {
-            case .ready(let periph):
-                return periph
+            case .ready:
+                guard let peripheral = self.peripheral else {
+                    throw LittleBluetoothError.peripheralNotConnectedOrAlreadyDisconnected
+                }
+                return peripheral
             case .notReady(_, let error?):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw error
             case .connectionFailed(_, let error?):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw error
             case .connectionFailed(let periph, _):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw LittleBluetoothError.couldNotConnectToPeripheral(PeripheralIdentifier(peripheral: periph), nil)
             case .disconnected(_, let error?):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw error
             case .disconnected(let periph, _):
-                self.cbCentral.cancelPeripheralConnection(self.peripheral!.cbPeripheral)
+                if let tracked = self.peripheral { self.cbCentral.cancelPeripheralConnection(tracked.cbPeripheral) }
                 self.peripheral = nil
                 throw LittleBluetoothError.peripheralDisconnected(PeripheralIdentifier(peripheral: periph), nil)
             default:
@@ -855,9 +858,6 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         }
         .mapError { (error) -> LittleBluetoothError in
                 error as! LittleBluetoothError
-        }
-        .map { [unowned self] peripheral -> Peripheral in
-            return self.peripheral!
         }
         .sink(receiveCompletion: { [unowned self, key] (completion) in
             switch completion {
