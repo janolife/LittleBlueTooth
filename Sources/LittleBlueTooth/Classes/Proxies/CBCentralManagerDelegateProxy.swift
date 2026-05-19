@@ -122,7 +122,7 @@ extension CBCentralManagerDelegateProxy: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, timestamp: CFAbsoluteTime, isReconnecting: Bool, error: Error?) {
-        logHandler?("didDisconnect \(peripheral.identifier), isReconnecting: \(isReconnecting), error: \(error?.localizedDescription ?? "none")", .info, .connection)
+        logHandler?("didDisconnect \(peripheral.identifier), isReconnecting: \(isReconnecting), error: \(error?.localizedDescription ?? "none")", isReconnecting ? .info : .warning, .connection)
         isAutoconnectionActive = false
         var lttlError: LittleBluetoothError?
         if let error = error {
