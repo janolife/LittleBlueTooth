@@ -8,9 +8,9 @@
 
 import Foundation
 #if TEST
-@preconcurrency import  CoreBluetoothMock
+import CoreBluetoothMock
 #else
-@preconcurrency import CoreBluetooth
+import CoreBluetooth
 #endif
 
 
@@ -20,6 +20,12 @@ public protocol PeripheralIdentifiable: Identifiable {
     var name: String? {get set}
 }
 /// An object that contains the unique identifier of the `CBPeripheral` and the name of it (if present)
+// @unchecked Sendable is a runtime contract, not a compile-time proof. This
+// struct holds an optional non-Sendable `CBPeripheral` reference that is
+// typically set at init from a CBPeripheral retained elsewhere (the
+// `LittleBlueTooth` / `Peripheral` wrapper). `cbPeripheral` is declared
+// `public var` for legacy API reasons; callers are expected — but not forced —
+// to treat it as write-once. Concurrent reassignment is undefined behavior.
 public struct PeripheralIdentifier: PeripheralIdentifiable, @unchecked Sendable {
     /// The `UUID`of the peripheral
     public var id: UUID
