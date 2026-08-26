@@ -1043,7 +1043,6 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
         return discoverSubject.eraseToAnyPublisher()
     }
     
-    #if !TEST
     /// Open an L2CAP channel to the connected peripheral
     /// - parameter psm: The Protocol/Service Multiplexer (PSM) value for the channel
     /// - returns: A publisher with the opened L2CAP channel or a LittleBluetoothError
@@ -1077,7 +1076,6 @@ public final class LittleBlueTooth: Identifiable, @unchecked Sendable {
 
         return l2capSubject.eraseToAnyPublisher()
     }
-    #endif
     
     // MARK: - Private
     private func restore(_ restorer: CentralRestorer) -> Restored {

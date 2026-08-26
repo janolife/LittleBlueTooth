@@ -600,7 +600,6 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         return writeListen
     }
     
-    #if !TEST
     func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
         let futKey = UUID()
         let openChannel = Deferred {
@@ -635,11 +634,27 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         .eraseToAnyPublisher()
         
         defer {
+            #if TEST
+            let result = LittleBlueToothTestHooks.l2capChannelProvider?(psm)
+            let proxy = UncheckedSendableBox(peripheralProxy)
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let channel):
+                    proxy.value.peripheralOpenedL2CAPChannelPublisher.send((channel, nil))
+                case .failure(let error):
+                    proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+                case nil:
+                    let error = NSError(domain: "LittleBlueToothTest", code: -2,
+                                        userInfo: [NSLocalizedDescriptionKey: "No l2capChannelProvider installed"])
+                    proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+                }
+            }
+            #else
             cbPeripheral.openL2CAPChannel(psm)
+            #endif
         }
         return openChannel
     }
-    #endif
 
     // MARK: - Public
     
