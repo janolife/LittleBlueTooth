@@ -629,30 +629,32 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         self.removeAndCancelSubscriber(for: futKey)
                     }
                     .store(in: self.disposeBag, for: futKey)
+
+                #if TEST
+                let result = LittleBlueToothTestHooks.l2capChannelProvider?(psm)
+                let proxy = UncheckedSendableBox(self.peripheralProxy)
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let channel):
+                        proxy.value.peripheralOpenedL2CAPChannelPublisher.send((channel, nil))
+                    case .failure(let error):
+                        proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+                    case nil:
+                        let error = NSError(domain: "LittleBlueToothTest", code: -2,
+                                            userInfo: [NSLocalizedDescriptionKey: "No l2capChannelProvider installed"])
+                        proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+                    }
+                }
+                #endif
             }
         }
         .eraseToAnyPublisher()
-        
+
+        #if !TEST
         defer {
-            #if TEST
-            let result = LittleBlueToothTestHooks.l2capChannelProvider?(psm)
-            let proxy = UncheckedSendableBox(peripheralProxy)
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let channel):
-                    proxy.value.peripheralOpenedL2CAPChannelPublisher.send((channel, nil))
-                case .failure(let error):
-                    proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
-                case nil:
-                    let error = NSError(domain: "LittleBlueToothTest", code: -2,
-                                        userInfo: [NSLocalizedDescriptionKey: "No l2capChannelProvider installed"])
-                    proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
-                }
-            }
-            #else
             cbPeripheral.openL2CAPChannel(psm)
-            #endif
         }
+        #endif
         return openChannel
     }
 
