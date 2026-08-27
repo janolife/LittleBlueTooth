@@ -633,7 +633,10 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                 #if TEST
                 let result = LittleBlueToothTestHooks.l2capChannelProvider?(psm)
                 let proxy = UncheckedSendableBox(self.peripheralProxy)
-                DispatchQueue.main.async {
+                // 50 ms mimics real channel-open latency: LittleBlueTooth.openL2CAPChannel's outer
+                // chain subscribes eagerly and its subject drops values sent before the caller's
+                // task-scheduled subscription attaches (known production race, deferred upstream).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     switch result {
                     case .success(let channel):
                         proxy.value.peripheralOpenedL2CAPChannelPublisher.send((channel, nil))
