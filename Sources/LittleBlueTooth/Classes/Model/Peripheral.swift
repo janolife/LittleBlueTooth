@@ -600,7 +600,6 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
         return writeListen
     }
     
-    #if !TEST
     func openL2CAPChannel(psm: CBL2CAPPSM) -> AnyPublisher<CBL2CAPChannel, LittleBluetoothError> {
         let futKey = UUID()
         let openChannel = Deferred {
@@ -630,16 +629,37 @@ public final class Peripheral: Identifiable, @unchecked Sendable {
                         self.removeAndCancelSubscriber(for: futKey)
                     }
                     .store(in: self.disposeBag, for: futKey)
+
+                #if TEST
+                let result = LittleBlueToothTestHooks.l2capChannelProvider?(psm)
+                let proxy = UncheckedSendableBox(self.peripheralProxy)
+                // 50 ms mimics real channel-open latency: LittleBlueTooth.openL2CAPChannel's outer
+                // chain subscribes eagerly and its subject drops values sent before the caller's
+                // task-scheduled subscription attaches (known production race, deferred upstream).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    switch result {
+                    case .success(let channel):
+                        proxy.value.peripheralOpenedL2CAPChannelPublisher.send((channel, nil))
+                    case .failure(let error):
+                        proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+                    case nil:
+                        let error = NSError(domain: "LittleBlueToothTest", code: -2,
+                                            userInfo: [NSLocalizedDescriptionKey: "No l2capChannelProvider installed"])
+                        proxy.value.peripheralOpenedL2CAPChannelPublisher.send((nil, .couldNotOpenL2CAPChannel(error: error)))
+                    }
+                }
+                #endif
             }
         }
         .eraseToAnyPublisher()
-        
+
+        #if !TEST
         defer {
             cbPeripheral.openL2CAPChannel(psm)
         }
+        #endif
         return openChannel
     }
-    #endif
 
     // MARK: - Public
     
